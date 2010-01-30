@@ -282,8 +282,31 @@ class PlayStationMemoryCardReader(object):
     return ''.join(result)
 
   def write(self, offset, data):
-    # TODO
-    raise NotImplementedError
+    card_type = self.getCardType()
+    if card_type == 1:
+      read = self.readFrame
+      write = self.writeFrame
+      block_length = FRAME_LENGTH
+      max_length = PS1_CARD_SIZE
+    elif card_type == 2:
+      read = self.readPage
+      write = self.writePage
+      block_length = PAGE_LENGTH
+      max_length = PS2_CARD_SIZE
+    else:
+      raise ValueError, 'No/unknown card (%02x)' % (card_type, )
+    if offset + len(data) > max_length:
+      raise ValueError, 'Trying to write out of card.'
+    current_block, start_offset = divmod(offset, block_length)
+    if start_offset:
+      data = read(current_block)[:start_offset] + data
+    while len(data) >= block_length:
+      to_write, data = data[:block_length], data[block_length:]
+      write(current_block, to_write)
+      current_block += 1
+    data_len = len(data)
+    if data_len:
+      write(current_block, data + read(current_block)[data_len:])
 
   def getSize(self):
     return CARD_SIZE_DICT[self.getCardType()]
