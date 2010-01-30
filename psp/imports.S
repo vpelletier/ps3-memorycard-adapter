@@ -1,0 +1,9 @@
+        .set noreorder
+#include "pspimport.s"
+        IMPORT_START "USBSnoopRelay",0x40090000
+        IMPORT_FUNC  "USBSnoopRelay",0xB16B0FA5,usbSnoopSendToHost
+        IMPORT_FUNC  "USBSnoopRelay",0x1B7DEAD4,usbSnoopRecvFromHost
+        IMPORT_FUNC  "USBSnoopRelay",0x6ECCCF35,usbSnoopCancelRecv
+        IMPORT_FUNC  "USBSnoopRelay",0x3CA8E72C,usbSnoopIsAttached
+        IMPORT_FUNC  "USBSnoopRelay",0x2E4F7458,usbSnoopWaitForAttachment
+        IMPORT_FUNC  "USBSnoopRelay",0xF4CCE048,usbSnoopInit
