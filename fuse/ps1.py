@@ -95,7 +95,7 @@ class PS1Save(object):
     title = self._title
     if title is None:
       encoded_title = self._card.readBlock(self._block_list[0])[ \
-        SAVE_TITLE_OFFSET:SAVE_TITLE_OFFSET + SAVE_TITLE_LEN]
+        SAVE_TITLE_OFFSET:SAVE_TITLE_OFFSET + SAVE_TITLE_LENGTH]
       char_list = []
       append = char_list.append
       for char_index in xrange(0, SAVE_TITLE_LENGTH, 2):
