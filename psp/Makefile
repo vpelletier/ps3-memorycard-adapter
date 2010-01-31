@@ -1,6 +1,5 @@
 release: all
 	make -C usbsnoopdriver
-	cp usbsnoopdriver/usbsnoopdriver.prx .
 	mksfo 'MCAuth' PARAM.SFO
 	pack-pbp EBOOT.PBP PARAM.SFO NULL NULL NULL NULL NULL main.prx NULL
 

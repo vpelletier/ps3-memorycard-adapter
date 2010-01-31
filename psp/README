@@ -18,7 +18,7 @@ Installation:
 - Create destination directory on the memory stick:
   mkdir $MS_ROOT/PSP/GAME/MCAuth
 - Copy the server and its usb driver:
-  cp EBOOT.PBP usbsnoopdriver.prx $MS_ROOT/PSP/GAME/MCAuth/
+  cp EBOOT.PBP usbsnoopdriver/usbsnoopdriver.prx $MS_ROOT/PSP/GAME/MCAuth/
 
 Usage:
 - start MCAuth on your PSP
