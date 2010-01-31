@@ -1,0 +1,12 @@
+To do:
+- PS1 memorycard filesystem fuse module
+- PS2 memorycard filesystem fuse module
+
+Done:
+- understand PS1 read/write protocol
+- understand PS2 authentication protocol
+- write an authentication daemon using the PS3
+- understand PS2 read/write protocol
+- write NBD daemon for easy device access
+- write udev rules to give access to regular users to the device
+
