@@ -1,5 +1,10 @@
 Authentication daemon for PSP.
 
+First, a word for people reviewing the code:
+This code is a dirty, trial-and-error, probably overcomplex, bunch
+of lines. It should be rewritten to improve its usability, and make it nicer
+to read.
+
 Use requirements:
 - a PSP capable of runing homebrew programs
 - a PS3
