@@ -27,6 +27,9 @@ Usage:
 Notes:
 Transfer speed is very low: 10kB/s for PS1 cards, 20kB/s for PS2 cards on my
 system.
+Just as any other device, don't unplug it without properly
+unbinding/unmounting it before. Same goes for removing the card from the
+reader.
 
 Authentication Daemon:
 PS2 card access requires the host (computer) to authenticate itself to the
