@@ -11,18 +11,6 @@ GAME_CODE_OFFSET = 0x16
 
 SAVE_TITLE_OFFSET = 0x4
 SAVE_TITLE_LENGTH = 0x5c # XXX: is it true ?
-TITLE_CHAR_DICT = {
-  0x8144: '.',
-  0x8146: ':',
-  0x8168: '"',
-  0x8169: '(',
-  0x816A: ')',
-  0x816D: '[',
-  0x816E: ']',
-  0x817C: '-',
-  0x8293: '%',
-  0x8295: '&',
-}
 PALETTE_OFFSET = 0x60
 PALETTE_ENTRY_FORMAT = '>h'
 PALETTE_ENTRY_LEN = calcsize(PALETTE_ENTRY_FORMAT)
