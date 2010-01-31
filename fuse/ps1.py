@@ -31,11 +31,11 @@ class PS1Card(object):
     self._device = device
 
   def _seekToBlock(self, block_number):
-    assert 0 < block_number < BLOCK_COUNT, hex(block_number)
+    assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
     self._device.seek(block_number * BLOCK_LENGTH)
 
   def _seekToBlockHeader(self, block_number):
-    assert 0 < block_number < BLOCK_COUNT, hex(block_number)
+    assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
     self._device.seek(block_number * BLOCK_HEADER_LENGTH)
 
   def readBlockHeader(self, block_number):
