@@ -1,0 +1,47 @@
+Authentication daemon for PSP.
+
+Use requirements:
+- a PSP capable of runing homebrew programs
+- a PS3
+- a wifi network which can be accessed by the PSP
+- a USB cable with A-type and mini-B-type connectors (for example, the one
+  bundled with your PS3)
+- a PSP-compatible memory stick
+
+Compilation requirements:
+- a working psp toolchain: http://ps2dev.org/psp/Tools/Toolchain
+
+Compilation:
+- run "make"
+
+Installation:
+- Create destination directory on the memory stick:
+  mkdir $MS_ROOT/PSP/GAME/MCAuth
+- Copy the server and its usb driver:
+  cp EBOOT.PBP usbsnoopdriver.prx $MS_ROOT/PSP/GAME/MCAuth/
+
+Usage:
+- start MCAuth on your PSP
+- select the network configuration to use
+- on your PS3, enter the "PS/PS2 Memory card utility" submenu in the "game"
+  menu and stay in it (if you are in the right menu, you should see the
+  "Create a new internal memory card" option, along with your internal cards)
+- plug your PSP to your PS3 with the USB cable
+
+The auth daemon is ready to use.
+
+Stopping the daemon:
+- press the "home" button on the PSP
+- confirm exit
+
+How it works:
+The PSP is used as a card reader simulator: it makes the PS3 believe it is
+Sony's official PS1/PS2 USB memory card reader. This way, it makes the PS3
+try to authenticate with it.
+When a program needs to get the correct authentication answer for an initial
+chanlenge value, it sends it to the PSP via WIFI. Upon receiving it, the PSP
+will simulate the connection of the card reader, the PS3 will start the
+authentication process and the PSP will send received chalenge value to the
+PS3, and send back the authentication answer given by the PS3.
+The whole process takes about one second per attempt.
+

@@ -1,0 +1,37 @@
+Access Playstation (1 & 2) memory cards using Sony's official PS3 USB adapter
+as regular block devices via an NBD server.
+
+Dependencies:
+- python-libusb1: http://github.com/vpelletier/python-libusb1
+
+Requirements:
+- USB host runing Linux (ie: any computer with USB ports)
+- For PS2 card access only, an authentication daemon (see below)
+
+Installation:
+- as root:
+  - copy udev/playstation-card-reader.rules to /etc/udev/rules.d/
+  - restart udev
+
+Usage:
+- plug your PS3 usb adapter
+- Start the NBD server: ./main.py
+- As root:
+  - bind NBD server to an nbd device: nbd-client 127.0.0.1 20530 /dev/nbd0
+  - do whatever you want to do with the nbd device
+    Example:
+      dd if=/dev/nbd0 of=ps_card.img bs=1024
+  - unbind device: nbd-client -d /dev/nbd0
+- Stop NBD server (ex, with a ctrl-c)
+
+Notes:
+Transfer speed is very low: 10kB/s for PS1 cards, 20kB/s for PS2 cards on my
+system.
+
+Authentication Daemon:
+PS2 card access requires the host (computer) to authenticate itself to the
+card reader. This authentication mechanism is not reverse-engineered. Hence,
+the NBD server was written with the support for an external daemon doing auth
+work. This way, it can (indirectly) use an actual PS3 as authentication data
+source. See "psp" directory on this repository for an authentication daemon.
+
