@@ -1,11 +1,12 @@
 #!/usr/bin/python
+import socket
+import usb1
+from nbd import NBDServer
+from cache import FileDictCache
+from authenticator import SockAuthenticator
+from memory_card_reader import PlayStationMemoryCardReader
+
 def main(options):
-  import socket
-  import usb1
-  from nbd import NBDServer
-  from cache import FileDictCache
-  from authenticator import SockAuthenticator
-  from memory_card_reader import PlayStationMemoryCardReader
   nbd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   nbd_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   nbd_sock.bind((options.nbd_address, options.nbd_port))
