@@ -167,10 +167,18 @@ class PlayStationMemoryCardReader(object):
 
   def writePage(self, page_number, data):
     assert len(data) == PAGE_LENGTH
-    raise NotImplementedError
     # TODO:
     # - check page number
-    # - implement (!)
+    self.authenticate()
+    self._commandWrite(''.join((
+      '\x57\x03',
+      pack('<i', page_number),
+      data,
+      '\x55\x2b'
+    )))
+    response = self._responseRead()
+    assert len(response) == 1, hexdump(response)
+    assert response == RESPONSE_STATUS_SUCCES, hexdump(response)
 
   def getRandomNumber(self, seq_number=4):
     """
