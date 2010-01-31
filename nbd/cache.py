@@ -3,7 +3,27 @@ LEN_FORMAT = '>h'
 LEN_LEN = calcsize(LEN_FORMAT)
 
 class FileDictCache(object):
+  """
+    Simple (de)pickler class for a dictionary of the following structure:
+      {string: (string, [...]), [...]}
+    values.
+    Instances of this class implement basic dict API (__getitem__ and
+    __setitem__) and can be used to access file data.
+
+    Important note: the file is only appended to, so updating a dictionary
+    entry will actualy append the new value to file.
+    Also, there is no support for deleting a dict entry.
+  """
+
   def __init__(self, filename, read_only=True):
+    """
+      Fetches data from file to populate in-ram dictionary.
+
+      filename (string)
+        Name of the file containing pickled data.
+      read_only (bool)
+        Whether this class should be allowed to write to file.
+    """
     self._read_only = read_only
     if read_only:
       mode = 'r'
@@ -73,6 +93,13 @@ class FileDictCache(object):
       self.flush() # XXX
 
   def flush(self):
+    """
+      Store modified entries in file.
+
+      XXX: This is currently always called after a __setitem__. This might
+      change, so better to call it explicitely before destructing an instance
+      of this class, otherwise you will loose unsaved data.
+    """
     if not self._read_only:
       write = self._cache_file.write
 

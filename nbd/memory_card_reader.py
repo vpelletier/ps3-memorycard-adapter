@@ -112,6 +112,9 @@ class PlayStationMemoryCardReader(object):
 
   # PS1
   def readFrame(self, frame_number):
+    """
+      Read a frame from PS1 card.
+    """
     # TODO:
     # - check frame number
     encoded_frame_number = pack('>h', frame_number)
@@ -130,6 +133,9 @@ class PlayStationMemoryCardReader(object):
     return data
 
   def writeFrame(self, frame_number, data):
+    """
+      Write a frame to PS1 card.
+    """
     assert len(data) == FRAME_LENGTH
     # TODO:
     # - check frame number
@@ -156,6 +162,9 @@ class PlayStationMemoryCardReader(object):
 
   # PS2
   def readPage(self, page_number):
+    """
+      Read a page from PS2 card.
+    """
     # TODO:
     # - check page number
     self.authenticate()
@@ -166,6 +175,9 @@ class PlayStationMemoryCardReader(object):
     return data
 
   def writePage(self, page_number, data):
+    """
+      Write a page to PS2 card.
+    """
     assert len(data) == PAGE_LENGTH
     # TODO:
     # - check page number
@@ -182,7 +194,7 @@ class PlayStationMemoryCardReader(object):
 
   def getRandomNumber(self, seq_number=4):
     """
-      This number is used in authentication process.
+      This number is used in PS2 card authentication process.
       Host must convert it and send conversion result back to device later to
       prove it is an authorised host. This job must be done by authenticator
       instance given at construction time.
@@ -279,6 +291,12 @@ class PlayStationMemoryCardReader(object):
 
   # IO helpers
   def read(self, offset, length):
+    """
+      Read data starting at <offset> bytes for <length> bytes.
+
+      offset & length can be of arbitrary values, as long as they fit in
+      memory card space.
+    """
     card_type = self.getCardType()
     if card_type == 1:
       read = self.readFrame
@@ -308,6 +326,13 @@ class PlayStationMemoryCardReader(object):
     return ''.join(result)
 
   def write(self, offset, data):
+    """
+      Write <data> starting at <offset>.
+
+      offset & data length can be of arbitrary values, as long as they fit in
+      memory card space. This function will take care reading existing block
+      data if write does not start and/or stop on an underlying block boundary.
+    """
     card_type = self.getCardType()
     if card_type == 1:
       read = self.readFrame
@@ -339,6 +364,33 @@ class PlayStationMemoryCardReader(object):
 
   # Authentication
   def authenticate(self):
+    """
+      Authentication scenario.
+      The meaning of most of this is unknown, but it is enough to have it
+      work.
+
+      Basicaly, authentication is protected by 2 mechanisms:
+      - 1-way (maybe even 2-way) identification
+        Device generates a random seed and checks value sent by host.
+        This is to prevent replay attacks.
+        As we want to access data whatever the device is, we don't have to
+        care about the existence of the 2nd part of auth if it exists.
+      - Upper time limit on exchanges
+        If hosts takes too long between USB queries, the device refuses the
+        auth.
+        This is to protect against rogue implementations of authentication
+        mechanism, which might take too long to compute responses.
+
+      But there is a huge weakness in the implementation of this otherwise
+      robust process: pseudo-random number generator in the device is extremely
+      weak, making the whole process vulnerable to replay attacks.
+      Measures found that:
+      - Out of 1000 random number generations, one of 2 values is generated 50%
+        of the time. So knowing the answer for 2 seeds gives a 50% chance of
+        auth success.
+      - Sadly, the PRNG is seeded upon replugging, so it's not possible to
+        go off with a 2-entry rainbow table.
+    """
     while not self.isAuthenticated():
       # ?
       self.__81f3()

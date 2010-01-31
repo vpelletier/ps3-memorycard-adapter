@@ -3,7 +3,21 @@ import time
 SEED_LENGTH = 9
 
 class SockAuthenticator(object):
+  """
+    Class to fetch authentication data through a connection to an
+    authentication server.
+  """
   def __init__(self, ip, port, authentication_cache=None):
+    """
+      ip (string)
+        Address of the authentication server.
+      port (int)
+        Port of the authentication server.
+      authentication_cache (dict-ish, or None)
+        Used to store and retrieve cached authentication data.
+        If None (default), a volatile cache will be used (it will be destroyed
+        when the instance is destroyed).
+    """
     self._ip = ip
     self._port = port
     self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -13,6 +27,13 @@ class SockAuthenticator(object):
     self._authentication_cache = authentication_cache
 
   def authenticate(self, seed):
+    """
+      Send seed to authentication server.
+      seed (string)
+        This value must have a length of 9
+
+      Return value: 3-tuple of strings.
+    """
     try:
       result = self._authentication_cache[seed]
     except KeyError:
