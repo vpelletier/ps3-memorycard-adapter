@@ -8,6 +8,7 @@ CHAINED_BLOCK_NUMBER_OFFSET = 0x8
 PRODUCT_CODE_OFFSET = 0xc
 PRODUCT_CODE_LENGTH = 0xa
 GAME_CODE_OFFSET = 0x16
+GAME_CODE_LENGTH = 8 # XXX: is it true ?
 
 PSX_DIRECTORY_USED = 0x50
 PSX_BLOCK_TOP = 0x01
@@ -63,7 +64,8 @@ class PS1Save(object):
     block_header = card.readBlockHeader(first_block_number)
     self._product_code = block_header[PRODUCT_CODE_OFFSET: \
       PRODUCT_CODE_OFFSET + PRODUCT_CODE_LENGTH]
-    self._game_code = block_header[GAME_CODE_OFFSET:]
+    self._game_code = block_header[GAME_CODE_OFFSET: \
+      GAME_CODE_OFFSET + GAME_CODE_LENGTH]
     while True:
       raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
         CHAINED_BLOCK_NUMBER_OFFSET + 2]
