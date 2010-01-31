@@ -18,7 +18,8 @@ NBD_RESPONSE_MAGIC = '\x67\x44\x66\x98'
 ERROR_BAD_MAGIC = 1
 ERROR_NOT_IMPLEMENTED = 2
 ERROR_SHORT_READ = 3
-ERROR_OTHER = 4
+ERROR_READ_ONLY = 4
+ERROR_OTHER = 5
 
 NBD_FLAG_HAS_FLAGS = 1
 NBD_FLAG_READ_ONLY = 1 << 1
@@ -38,6 +39,7 @@ class NBDServer(object):
     flags = NBD_FLAG_HAS_FLAGS
     if read_only:
       flags |= NBD_FLAG_READ_ONLY
+    self._read_only = read_only
     sock.sendall(pack('>Qi', self._size, flags))
     sock.sendall(NBD_GREETING_SUFFIX)
 
@@ -62,6 +64,8 @@ class NBDServer(object):
       data = sock.recv(length)
       if len(data) != length:
         result = False
+      elif self._read_only:
+        answer(sock, handle, error=ERROR_READ_ONLY)
       else:
         try:
           self._device.write(offset, data)
