@@ -57,7 +57,7 @@ class PS1Save(object):
   def __init__(self, card, first_block_number):
     self._card = card
     block_list = [first_block_number]
-    block_list.append
+    append = block_list.append
     self._block_list = block_list
     block_number = first_block_number
     block_header = card.readBlockHeader(first_block_number)
@@ -65,13 +65,13 @@ class PS1Save(object):
       PRODUCT_CODE_OFFSET + PRODUCT_CODE_LENGTH]
     self._game_code = block_header[GAME_CODE_OFFSET:]
     while True:
-      block_state = ord(block_header[0])
-      if block_state & PSX_BLOCK_LINK_END == PSX_BLOCK_LINK:
-        block_number = ord(block_header[CHAINED_BLOCK_NUMBER_OFFSET])
-        block_header = card.readBlockHeader(block_number)
-        append(block_number)
-      else:
+      raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
+        CHAINED_BLOCK_NUMBER_OFFSET + 2]
+      if raw_number == '\xff\xff':
         break
+      block_number = unpack('<h', raw_number)[0] + 1
+      block_header = card.readBlockHeader(block_number)
+      append(block_number)
 
   def getId(self):
     return str(self._block_list[0])
