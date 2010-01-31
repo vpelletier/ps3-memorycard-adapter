@@ -100,7 +100,7 @@ class PS1Save(object):
       append = char_list.append
       for char_index in xrange(0, SAVE_TITLE_LENGTH, 2):
         encoded_char = encoded_title[char_index:char_index + 2]
-        if char == '\x00':
+        if encoded_char[0] == '\x00':
           break
         append(encoded_char)
       title = ''.join(char_list).decode('shift_jis')
