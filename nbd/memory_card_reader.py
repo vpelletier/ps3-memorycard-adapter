@@ -131,10 +131,28 @@ class PlayStationMemoryCardReader(object):
 
   def writeFrame(self, frame_number, data):
     assert len(data) == FRAME_LENGTH
-    raise NotImplementedError
     # TODO:
     # - check frame number
-    # - implement (!)
+    encoded_frame_number = pack('>h', frame_number)
+    self._longCommandWrite(''.join((
+      '\x81\x57\x5a\x5d',
+      encoded_frame_number,
+      data,
+      '\x00', # XXX: seems to be some kind of checksum, but data seems written
+              # even without computing it
+      '\x5c\x5d\x47',
+    )))
+    response_code, response_data = self._longResponseRead()
+    assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
+    assert response_data[:4] == '\xff\x00\x5a\x5d',  hexdump(response_data[:4])
+    assert response_data[4] == '\x00', hexdump(response_data[4])
+    assert response_data[5:7] == encoded_frame_number, \
+      hexdump(response_data[5:6])
+    assert response_data[7:-3] == data, (hexdump(response_data[7:-3]), \
+      hexdump(data))
+    # XXX: the last byte of response changes from refernce dumps.
+    # This is probably because of the incorrect checksum.
+    #assert response_data[-3:] == '\x5c\x5d\x47', hexdump(response_data[-3:])
 
   # PS2
   def readPage(self, page_number):
