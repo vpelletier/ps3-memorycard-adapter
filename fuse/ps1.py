@@ -110,8 +110,8 @@ class PS1Card(object):
     superblock = self.readBlock(0)
     header_start = BLOCK_HEADER_LENGTH * block_number
     block_state = ord(superblock[header_start])
-    return block_state & PSX_DIRECTORY_USED \
-      and not (block_state & PSX_BLOCK_LINK)
+    return block_state & BLOCK_STATUS_USED == BLOCK_STATUS_USED \
+      and block_state & BLOCK_STATUS_LINKED == 0
 
   def iterSaveIdList(self):
     for block_number in xrange(1, BLOCK_COUNT):
