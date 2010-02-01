@@ -110,7 +110,7 @@ class PS1Save(object):
     else:
       return None
 
-  def hasEntry(seld, name):
+  def hasEntry(self, name):
     return name in SAVE_ENTRY_DICT
 
   def getEntrySize(self, name):
