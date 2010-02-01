@@ -118,6 +118,17 @@ class PS1Card(object):
       if self._isSaveHead(block_number):
         yield block_number
 
+  def iterChainedBlocks(self, block_number):
+    while True:
+      block_header = self.readBlockHeader(block_number)
+      raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
+        CHAINED_BLOCK_NUMBER_OFFSET + CHAINED_BLOCK_NUMBER_LENGTH]
+      if raw_number == '\xff\xff':
+        break
+      block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, raw_number)[0] + 1
+      block_header = self.readBlockHeader(block_number)
+      yield block_number
+
   def getSave(self, block_number):
     if self._isSaveHead(block_number):
       result = PS1Save(self, block_number)
@@ -141,13 +152,7 @@ class PS1Save(object):
       GAME_CODE_OFFSET + GAME_CODE_LENGTH]
     save_length = unpack(SAVE_LENGTH_FORMAT, block_header[SAVE_LENGTH_OFFSET: \
       SAVE_LENGTH_OFFSET + SAVE_LENGTH_LENGTH])[0]
-    while True:
-      raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
-        CHAINED_BLOCK_NUMBER_OFFSET + CHAINED_BLOCK_NUMBER_LENGTH]
-      if raw_number == '\xff\xff':
-        break
-      block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, raw_number)[0] + 1
-      block_header = card.readBlockHeader(block_number)
+    for block_number in card.iterChainedBlocks(first_block_number):
       append(block_number)
     assert save_length == self.getDataLength()
 
