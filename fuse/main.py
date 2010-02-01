@@ -23,7 +23,7 @@ class PlayStationStat(fuse.Stat):
 PATH_SEPARATOR = os.path.sep
 
 def split(path):
-  return [x for x in path.split(PATH_SEPARATOR) if x]
+    return [x for x in path.split(PATH_SEPARATOR) if x]
 
 class PlayStationMemoryCardFS(fuse.Fuse):
 
