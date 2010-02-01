@@ -133,6 +133,8 @@ class PS1Save(object):
     self._block_list = block_list
     block_number = first_block_number
     block_header = card.readBlockHeader(first_block_number)
+    self._region = block_header[REGION_CODE_OFFSET: \
+      REGION_CODE_OFFSET + REGION_CODE_LENGTH]
     self._product_code = block_header[PRODUCT_CODE_OFFSET: \
       PRODUCT_CODE_OFFSET + PRODUCT_CODE_LENGTH]
     self._game_code = block_header[GAME_CODE_OFFSET: \
@@ -184,6 +186,9 @@ class PS1Save(object):
        size = None
      return size
 
+  def getRegion(self):
+    return self._region
+
 SAVE_ENTRY_DICT = {
   'game_code': {
     'accessor': 'getGameCode',
@@ -196,6 +201,10 @@ SAVE_ENTRY_DICT = {
   'data': {
     'accessor': 'getData',
     'size': lambda x: len(x._block_list) * BLOCK_LENGTH,
+  },
+  'region': {
+    'accessor': 'getRegion',
+    'size': REGION_CODE_LENGTH,
   },
 }
 
