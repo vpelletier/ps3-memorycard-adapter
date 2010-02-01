@@ -25,13 +25,24 @@ PATH_SEPARATOR = os.path.sep
 def split(path):
     return [x for x in path.split(PATH_SEPARATOR) if x]
 
+def getBlockId(name):
+    if name.isdigit():
+        result = int(name)
+    else:
+        result = None
+    return result
+
+def asName(block_id):
+    return '%02i' % (block_id, )
+
 class PlayStationMemoryCardFS(fuse.Fuse):
 
     def __getSave(self, name):
-        if name.isdigit():
-           result = self.__card_device.getSave(int(name))
-        else:
+        block_id = getBlockId(name)
+        if block_id is None:
            result = None
+        else:
+           result = self.__card_device.getSave(int(name))
         return result
 
     def getattr(self, path):
@@ -61,8 +72,8 @@ class PlayStationMemoryCardFS(fuse.Fuse):
         path_element_list = split(path)
         depth = len(path_element_list)
         if depth == 0:
+                yield fuse.Direntry(asName(save_id))
             for save_id in self.__card_device.iterSaveIdList():
-                yield fuse.Direntry(str(save_id))
         elif depth == 1:
             save = self.__getSave(path_element_list[0])
             if save is not None:
