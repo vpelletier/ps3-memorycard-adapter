@@ -139,6 +139,8 @@ class PS1Save(object):
       PRODUCT_CODE_OFFSET + PRODUCT_CODE_LENGTH]
     self._game_code = block_header[GAME_CODE_OFFSET: \
       GAME_CODE_OFFSET + GAME_CODE_LENGTH]
+    save_length = unpack(SAVE_LENGTH_FORMAT, block_header[SAVE_LENGTH_OFFSET: \
+      SAVE_LENGTH_OFFSET + SAVE_LENGTH_LENGTH])[0]
     while True:
       raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
         CHAINED_BLOCK_NUMBER_OFFSET + CHAINED_BLOCK_NUMBER_LENGTH]
@@ -147,6 +149,7 @@ class PS1Save(object):
       block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, raw_number)[0] + 1
       block_header = card.readBlockHeader(block_number)
       append(block_number)
+    assert save_length == self.getDataLength()
 
   def getId(self):
     return str(self._block_list[0])
@@ -186,6 +189,9 @@ class PS1Save(object):
        size = None
      return size
 
+  def getDataLength(self):
+    return len(self._block_list) * BLOCK_LENGTH
+
   def getRegion(self):
     return self._region
 
@@ -200,7 +206,7 @@ SAVE_ENTRY_DICT = {
   },
   'data': {
     'accessor': 'getData',
-    'size': lambda x: len(x._block_list) * BLOCK_LENGTH,
+    'size': lambda x: x.getDataLength(),
   },
   'region': {
     'accessor': 'getRegion',
