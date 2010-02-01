@@ -57,8 +57,20 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             st.st_mode = stat.S_IFREG | 0644
             st.st_nlink = 1
         elif depth == 1:
-            st.st_mode = stat.S_IFDIR | 0555
-            st.st_nlink = 2
+            link_map = self.__card_device.getBlockLinkMap()
+            block_id = getBlockId(path_element_list[0])
+            if block_id is None:
+                return -errno.ENOENT
+            target_id = link_map.get(block_id)
+            if target_id == block_id:
+                st.st_mode = stat.S_IFDIR | 0555
+                st.st_nlink = 2
+            elif target_id is None:
+                return -errno.ENOENT
+            else:
+                # Symlink
+                st.st_mode = stat.S_IFLNK | 0777
+                st.st_nlink = 1
         elif depth == 0:
             st.st_mode = stat.S_IFDIR | 0755
             st.st_nlink = 2
@@ -66,14 +78,29 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             return -errno.ENOENT
         return st
 
+    def readlink(self, path):
+        path_element_list = split(path)
+        depth = len(path_element_list)
+        if depth == 1:
+            link_map = self.__card_device.getBlockLinkMap()
+            block_id = getBlockId(path_element_list[0])
+            if block_id is None:
+                return -errno.ENOENT 
+            target_id = link_map.get(block_id)
+            if target_id is None:
+                return -errno.ENOENT
+            return asName(target_id)
+        else:
+            return -errno.ENOENT
+
     def readdir(self, path, offset):
         for entry in ('.', '..'):
           yield fuse.Direntry(entry)
         path_element_list = split(path)
         depth = len(path_element_list)
         if depth == 0:
+            for save_id in self.__card_device.getBlockLinkMap().iterkeys():
                 yield fuse.Direntry(asName(save_id))
-            for save_id in self.__card_device.iterSaveIdList():
         elif depth == 1:
             save = self.__getSave(path_element_list[0])
             if save is not None:

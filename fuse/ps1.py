@@ -129,11 +129,21 @@ class PS1Card(object):
       block_header = self.readBlockHeader(block_number)
       yield block_number
 
+  def getBlockLinkMap(self):
+    link_map = {}
+    for block_number in xrange(1, BLOCK_COUNT):
+      if block_number not in link_map and self._isSaveHead(block_number):
+        link_map[block_number] = block_number
+        for chained_block_number in self.iterChainedBlocks(block_number):
+          link_map[chained_block_number] = block_number
+    return link_map
+
   def getSave(self, block_number):
-    if self._isSaveHead(block_number):
-      result = PS1Save(self, block_number)
-    else:
+    base_block_number = self.getBlockLinkMap().get(block_number)
+    if base_block_number is None:
       result = None
+    else:
+      result = PS1Save(self, base_block_number)
     return result
 
 class PS1Save(object):
