@@ -1,5 +1,48 @@
 from struct import pack, unpack, calcsize
 
+"""
+Some rules for this description:
+ - Individual bytes are displayed in file order (file offset increases when
+   reading to the right).
+ - Numbers are in decimal unless prefixed by '0x'
+ - Strings are ASCII representations of bytes
+
+PS1 Memory Card structure
+  16 * 8kB blocks
+  First block: block allocation table
+  Other blocks: Data
+
+Block allocation table structure:
+  16 * 128B entries (one per block, in same order)
+  Last byte of each entry is a XOR checksum of entry's bytes.
+  First entry starts with 0x4D 0x43 ("MC") and is filled with zeros.
+  Other entries scruture (offset, length):
+    0x0, 1: Block content
+      From LSb to MSb
+      Bit 0:
+        0: Intermediate link block
+        1: Linked block list start or end (bit 1 must be 1)
+      Bit 1:
+        0: Single block or first block of a linked list
+        1: Linked block
+      Bits 4..7:
+        0x5: Block used
+        0xA: Block free
+    0x4, 4: Save size
+      Integer, LSB first
+    0x8, 2: Next linked block
+      Integer, LSB first
+      0xffff means "no next block".
+      Beware: The first allocation entry is not numbered, so first save block
+      is block 0, not 1.
+    0xb, 1: Game region
+      0x41 ("A"): America (SCEA)
+      0x45 ("E"): Europe (SCEE)
+      0x49 ("I"): Japan (SCEI)
+    0xc, 10: Product code
+    0x10, 8: Save identifier
+"""
+
 BLOCK_COUNT = 0x10
 BLOCK_LENGTH = 0x2000
 BLOCK_HEADER_LENGTH = 0x80
