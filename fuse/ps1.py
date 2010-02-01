@@ -83,7 +83,14 @@ class PS1Card(object):
 
   def readBlockHeader(self, block_number):
     self._seekToBlockHeader(block_number)
-    return self._device.read(BLOCK_HEADER_LENGTH)
+    header = self._device.read(BLOCK_HEADER_LENGTH)
+    # Check header consistency
+    computed_xor = 0
+    for byte in header:
+      computed_xor ^= ord(byte)
+    if computed_xor:
+      raise ValueError, 'Header %i corrupted' % (block_number, )
+    return header
 
   def writeBlockHeader(self, block_number, data):
     assert len(data) == BLOCK_HEADER_LENGTH, hex(len(data))
