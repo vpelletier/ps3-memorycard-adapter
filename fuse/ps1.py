@@ -111,9 +111,8 @@ class PS1Card(object):
     self._device.write(data)
 
   def _isSaveHead(self, block_number):
-    superblock = self.readBlock(0)
-    header_start = BLOCK_HEADER_LENGTH * block_number
-    block_state = ord(superblock[header_start])
+    block_header = self.readBlockHeader(block_number)
+    block_state = ord(block_header[0])
     return block_state & BLOCK_STATUS_USED == BLOCK_STATUS_USED \
       and block_state & BLOCK_STATUS_LINKED == 0
 
