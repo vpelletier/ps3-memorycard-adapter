@@ -99,7 +99,13 @@ class PS1Card(object):
   def writeBlockHeader(self, block_number, data):
     assert len(data) == BLOCK_HEADER_LENGTH, hex(len(data))
     self._seekToBlockHeader(block_number)
-    self._device.write(data)
+    actual_data = data[:-1]
+    # Compute consistency check value
+    computed_xor = 0
+    for byte in actual_data:
+      computed_xor ^= ord(byte)
+    self._device.write(actual_data)
+    self._device.write(chr(computed_xor))
 
   def readBlock(self, block_number):
     self._seekToBlock(block_number)
