@@ -5,6 +5,9 @@ BLOCK_LENGTH = 0x2000
 BLOCK_HEADER_LENGTH = 0x80
 
 CHAINED_BLOCK_NUMBER_OFFSET = 0x8
+CHAINED_BLOCK_NUMBER_FORMAT = '<h'
+CHAINED_BLOCK_NUMBER_LENGTH = 2
+assert calcsize(CHAINED_BLOCK_NUMBER_FORMAT) == CHAINED_BLOCK_NUMBER_LENGTH
 PRODUCT_CODE_OFFSET = 0xc
 PRODUCT_CODE_LENGTH = 0xa
 GAME_CODE_OFFSET = 0x16
@@ -77,10 +80,10 @@ class PS1Save(object):
       GAME_CODE_OFFSET + GAME_CODE_LENGTH]
     while True:
       raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
-        CHAINED_BLOCK_NUMBER_OFFSET + 2]
+        CHAINED_BLOCK_NUMBER_OFFSET + CHAINED_BLOCK_NUMBER_LENGTH]
       if raw_number == '\xff\xff':
         break
-      block_number = unpack('<h', raw_number)[0] + 1
+      block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, raw_number)[0] + 1
       block_header = card.readBlockHeader(block_number)
       append(block_number)
 
