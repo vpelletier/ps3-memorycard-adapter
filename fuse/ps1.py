@@ -1,4 +1,5 @@
 from struct import pack, unpack, calcsize
+from cStringIO import StringIO
 
 """
 Some rules for this description:
@@ -154,6 +155,46 @@ class PS1Card(object):
     else:
       result = PS1Save(self, base_block_number)
     return result
+
+  def createSave(self, block_number):
+    """
+      If block is free, mark it as used and erase content.
+    """
+    block_header = self.readBlockHeader(block_number)
+    if ord(block_header[0]) & BLOCK_STATUS_USED == 0:
+      block_header = StringIO()
+      write = block_header.write
+      seek = block_header.seek
+      write(chr(BLOCK_STATUS_USED | BLOCK_STATUS_END))
+      seek(SAVE_LENGTH_OFFSET)
+      write(pack(SAVE_LENGTH_FORMAT, BLOCK_LENGTH))
+      write(pack(CHAINED_BLOCK_NUMBER_FORMAT, -1))
+      write('B')
+      seek(BLOCK_HEADER_LENGTH - 1)
+      write('\x00')
+      self.writeBlockHeader(block_number, block_header.getvalue())
+      self.writeBlock(block_number, '\x00' * BLOCK_LENGTH)
+    else:
+      raise ValueError, 'Block already allocated'
+
+  def _freeBlock(self, block_number):
+    block_header = self.readBlockHeader(block_number)
+    self.writeBlockHeader(block_number,
+      chr(ord(block_header[0]) & 0xf | BLOCK_STATUS_FREE) + block_header[1:])
+
+  def deleteSave(self, block_number):
+    """
+      If block is used and not a linked block, mark it as free.
+      If it links to other blocks, mark them as free aswell.
+      No data is actualy erased.
+    """
+    block_header = self.readBlockHeader(block_number)
+    if ord(block_header[0]) & BLOCK_STATUS_USED == BLOCK_STATUS_USED:
+      for linked_block_number in self.iterChainedBlocks(block_number):
+        self._freeBlock(linked_block_number)
+      self._freeBlock(block_number)
+    else:
+      raise ValueError, 'Block already free'
 
 class PS1Save(object):
   def __init__(self, card, first_block_number):

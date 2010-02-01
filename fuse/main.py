@@ -109,6 +109,34 @@ class PlayStationMemoryCardFS(fuse.Fuse):
         else:
             yield -errno.ENOENT
 
+    def mkdir(self, path, mode):
+        path_element_list = split(path)
+        depth = len(path_element_list)
+        if depth == 1:
+            block_id = getBlockId(path_element_list[0])
+            if block_id is None:
+                return -errno.EPERM
+            try:
+                self.__card_device.createSave(block_id)
+            except ValueError:
+                return -errno.EEXIST
+        else:
+            return -errno.EPERM
+
+    def rmdir(self, path):
+        path_element_list = split(path)
+        depth = len(path_element_list)
+        if depth == 1:
+            block_id = getBlockId(path_element_list[0])
+            if block_id is None:
+                return -errno.ENOENT
+            try:
+                self.__card_device.deleteSave(block_id)
+            except ValueError:
+                return -errno.ENOENT
+        else:
+            return -errno.ENOENT
+
     def open(self, path, flags):
         path_element_list = split(path)
         if len(path_element_list) == 2:
