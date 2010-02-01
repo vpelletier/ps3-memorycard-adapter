@@ -70,6 +70,8 @@ GAME_CODE_LENGTH = 8
 class PS1Card(object):
   def __init__(self, device):
     self._device = device
+    superblock = self.readBlockHeader(0)
+    assert superblock[:len(SUPERBLOCK_MAGIC)] == SUPERBLOCK_MAGIC
 
   def _seekToBlock(self, block_number):
     assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
