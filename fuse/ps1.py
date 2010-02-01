@@ -35,6 +35,8 @@ Block allocation table structure:
       0xffff means "no next block".
       Beware: The first allocation entry is not numbered, so first save block
       is block 0, not 1.
+    0xa, 1: ?
+      0x42 ("B')
     0xb, 1: Game region
       0x41 ("A"): America (SCEA)
       0x45 ("E"): Europe (SCEE)
