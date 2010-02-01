@@ -26,12 +26,22 @@ def split(path):
   return [x for x in path.split(PATH_SEPARATOR) if x]
 
 class PlayStationMemoryCardFS(fuse.Fuse):
+
+    def __getSave(self, name):
+        if name.isdigit():
+           result = self.__card_device.getSave(int(name))
+        else:
+           result = None
+        return result
+
     def getattr(self, path):
         st = PlayStationStat()
         path_element_list = split(path)
         depth = len(path_element_list)
         if depth == 2:
-            save = self.__card_device.getSave(int(path_element_list[0]))
+            save = self.__getSave(path_element_list[0])
+            if save is None:
+                return -errno.ENOENT
             st.st_size = save.getEntrySize(path_element_list[1])
             st.st_mode = stat.S_IFREG | 0644
             st.st_nlink = 1
@@ -54,16 +64,19 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             for save_id in self.__card_device.iterSaveIdList():
                 yield fuse.Direntry(str(save_id))
         elif depth == 1:
-            save = self.__card_device.getSave(int(path_element_list[0]))
-            for entry in save.iterEntries():
-              yield fuse.Direntry(entry)
+            save = self.__getSave(path_element_list[0])
+            if save is not None:
+                for entry in save.iterEntries():
+                    yield fuse.Direntry(entry)
         else:
             yield -errno.ENOENT
 
     def open(self, path, flags):
         path_element_list = split(path)
         if len(path_element_list) == 2:
-            save = self.__card_device.getSave(int(path_element_list[0]))
+            save = self.__getSave(path_element_list[0])
+            if save is None:
+                return -errno.ENOENT
             if not save.hasEntry(path_element_list[1]):
                 return -errno.ENOENT
         else:
@@ -72,7 +85,9 @@ class PlayStationMemoryCardFS(fuse.Fuse):
     def read(self, path, size, offset):
         path_element_list = split(path)
         if len(path_element_list) == 2:
-            save = self.__card_device.getSave(int(path_element_list[0]))
+            save = self.__getSave(path_element_list[0])
+            if save is None:
+                return -errno.ENOENT
             return save.getEntry(path_element_list[1])[offset:offset + size]
         else:
             return -errno.ENOENT
