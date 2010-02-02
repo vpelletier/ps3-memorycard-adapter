@@ -1,4 +1,5 @@
 from struct import pack, unpack, calcsize
+import mmap
 from cStringIO import StringIO
 
 """
@@ -76,10 +77,21 @@ GAME_CODE_OFFSET = 0x10
 GAME_CODE_LENGTH = 8
 
 class PS1Card(object):
+  _device = None
+
   def __init__(self, device):
-    self._device = device
-    superblock = self.readBlockHeader(0)
-    assert superblock[:len(SUPERBLOCK_MAGIC)] == SUPERBLOCK_MAGIC
+    # Keep a reference to received file object se it doesn't get
+    # garbage-collected while we might still want to access its mmaped version.
+    self._raw_device = device
+    # On the contrary of what is advertised by python mmap module
+    # documentation, providing a 0 length to mmap won't map the whole file.
+    device.seek(0, 2)
+    self._device = mmap.mmap(device.fileno(), device.tell())
+    assert self._device[:len(SUPERBLOCK_MAGIC)] == SUPERBLOCK_MAGIC
+
+  def __del__(self):
+    if self._device is not None:
+      self._device.flush()
 
   def _seekToBlock(self, block_number):
     assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
@@ -102,14 +114,16 @@ class PS1Card(object):
 
   def writeBlockHeader(self, block_number, data):
     assert len(data) == BLOCK_HEADER_LENGTH, hex(len(data))
-    self._seekToBlockHeader(block_number)
-    actual_data = data[:-1]
-    # Compute consistency check value
+    offset = block_number * BLOCK_HEADER_LENGTH
+    self._device[offset:offset + BLOCK_HEADER_LENGTH] = data
+    self._updateXOR(block_number)
+
+  def _updateXOR(self, block_number):
+    offset = block_number * BLOCK_HEADER_LENGTH
     computed_xor = 0
-    for byte in actual_data:
+    for byte in self._device[offset:offset + BLOCK_HEADER_LENGTH - 1]:
       computed_xor ^= ord(byte)
-    self._device.write(actual_data)
-    self._device.write(chr(computed_xor))
+    self._device[offset + BLOCK_HEADER_LENGTH - 1] = chr(computed_xor)
 
   def readBlock(self, block_number):
     self._seekToBlock(block_number)
@@ -117,12 +131,12 @@ class PS1Card(object):
 
   def writeBlock(self, block_number, data):
     assert len(data) == BLOCK_LENGTH, hex(len(data))
-    self._seekToBlock(block_number)
-    self._device.write(data)
+    offset = block_number * BLOCK_LENGTH
+    self._device[offset:offset + BLOCK_LENGTH] = data
 
   def _isSaveHead(self, block_number):
-    block_header = self.readBlockHeader(block_number)
-    block_state = ord(block_header[0])
+    offset = block_number * BLOCK_HEADER_LENGTH
+    block_state = ord(self._device[offset])
     return block_state & BLOCK_STATUS_USED == BLOCK_STATUS_USED \
       and block_state & BLOCK_STATUS_LINKED == 0
 
@@ -133,13 +147,12 @@ class PS1Card(object):
 
   def iterChainedBlocks(self, block_number):
     while True:
-      block_header = self.readBlockHeader(block_number)
-      raw_number = block_header[CHAINED_BLOCK_NUMBER_OFFSET: \
-        CHAINED_BLOCK_NUMBER_OFFSET + CHAINED_BLOCK_NUMBER_LENGTH]
-      if raw_number == '\xff\xff':
+      offset = block_number * BLOCK_HEADER_LENGTH + CHAINED_BLOCK_NUMBER_OFFSET
+      block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, \
+        self._device[offset:offset + CHAINED_BLOCK_NUMBER_LENGTH])[0]
+      if block_number == CHAINED_BLOCK_VALUE_NONE:
         break
-      block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, raw_number)[0] + 1
-      block_header = self.readBlockHeader(block_number)
+      block_number += 1
       yield block_number
 
   def getBlockLinkMap(self):
@@ -163,27 +176,28 @@ class PS1Card(object):
     """
       If block is free, mark it as used and erase content.
     """
-    block_header = self.readBlockHeader(block_number)
-    if ord(block_header[0]) & BLOCK_STATUS_USED == 0:
-      block_header = StringIO()
-      write = block_header.write
-      seek = block_header.seek
-      write(chr(BLOCK_STATUS_USED | BLOCK_STATUS_END))
-      seek(SAVE_LENGTH_OFFSET)
-      write(pack(SAVE_LENGTH_FORMAT, BLOCK_LENGTH))
-      write(pack(CHAINED_BLOCK_NUMBER_FORMAT, -1))
-      write('B')
-      seek(BLOCK_HEADER_LENGTH - 1)
-      write('\x00')
-      self.writeBlockHeader(block_number, block_header.getvalue())
-      self.writeBlock(block_number, '\x00' * BLOCK_LENGTH)
+    offset = block_number * BLOCK_HEADER_LENGTH
+    if ord(self._device[offset]) & BLOCK_STATUS_USED == 0:
+      self._device[offset] = chr(BLOCK_STATUS_USED | BLOCK_STATUS_END)
+      save_length_offset = offset + SAVE_LENGTH_OFFSET
+      self._device[save_length_offset:save_length_offset + \
+        SAVE_LENGTH_LENGTH] = pack(SAVE_LENGTH_FORMAT, BLOCK_LENGTH)
+      chained_block_offset = offset + CHAINED_BLOCK_NUMBER_OFFSET
+      self._device[chained_block_offset:chained_block_offset + \
+        CHAINED_BLOCK_NUMBER_LENGTH] = pack(CHAINED_BLOCK_NUMBER_FORMAT, \
+        CHAINED_BLOCK_VALUE_NONE)
+      self._device[UNKNOWN_OFFSET_1] = UNKNOWN_OFFSET_1_VALUE
+      self._updateXOR(block_number)
+      data_offset = block_number * BLOCK_LENGTH
+      for offset in xrange(data_offset, data_offset + BLOCK_LENGTH):
+        self._device[offset] = '\x00'
     else:
       raise ValueError, 'Block already allocated'
 
   def _freeBlock(self, block_number):
-    block_header = self.readBlockHeader(block_number)
-    self.writeBlockHeader(block_number,
-      chr(ord(block_header[0]) & 0xf | BLOCK_STATUS_FREE) + block_header[1:])
+    offset = block_number * BLOCK_HEADER_LENGTH
+    block_state = ord(self._device[offset])
+    self._device[offset] = chr((block_state & 0xf) | BLOCK_STATUS_FREE)
 
   def deleteSave(self, block_number):
     """
@@ -191,8 +205,8 @@ class PS1Card(object):
       If it links to other blocks, mark them as free aswell.
       No data is actualy erased.
     """
-    block_header = self.readBlockHeader(block_number)
-    if ord(block_header[0]) & BLOCK_STATUS_USED == BLOCK_STATUS_USED:
+    offset = block_number * BLOCK_HEADER_LENGTH
+    if ord(self._device[offset]) & BLOCK_STATUS_USED == BLOCK_STATUS_USED:
       for linked_block_number in self.iterChainedBlocks(block_number):
         self._freeBlock(linked_block_number)
       self._freeBlock(block_number)
