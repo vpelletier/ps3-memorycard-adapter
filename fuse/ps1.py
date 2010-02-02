@@ -178,16 +178,22 @@ class PS1Card(object):
     """
     offset = block_number * BLOCK_HEADER_LENGTH
     if ord(self._device[offset]) & BLOCK_STATUS_USED == 0:
+      # Mark as used
       self._device[offset] = chr(BLOCK_STATUS_USED | BLOCK_STATUS_END)
+      # Initialise save length to 1 block
       save_length_offset = offset + SAVE_LENGTH_OFFSET
       self._device[save_length_offset:save_length_offset + \
         SAVE_LENGTH_LENGTH] = pack(SAVE_LENGTH_FORMAT, BLOCK_LENGTH)
+      # Mark there is no next block
       chained_block_offset = offset + CHAINED_BLOCK_NUMBER_OFFSET
       self._device[chained_block_offset:chained_block_offset + \
         CHAINED_BLOCK_NUMBER_LENGTH] = pack(CHAINED_BLOCK_NUMBER_FORMAT, \
         CHAINED_BLOCK_VALUE_NONE)
+      # Set unknown value 1
       self._device[UNKNOWN_OFFSET_1] = UNKNOWN_OFFSET_1_VALUE
+      # we're done editing header, compute XOR
       self._updateXOR(block_number)
+      # zero data block
       data_offset = block_number * BLOCK_LENGTH
       for offset in xrange(data_offset, data_offset + BLOCK_LENGTH):
         self._device[offset] = '\x00'
