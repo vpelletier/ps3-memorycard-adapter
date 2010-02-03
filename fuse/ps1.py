@@ -52,6 +52,7 @@ SUPERBLOCK_MAGIC = 'MC'
 BLOCK_COUNT = 0x10
 BLOCK_LENGTH = 0x2000
 BLOCK_HEADER_LENGTH = 0x80
+BLOCK_HEADER_AREA_LENGTH = BLOCK_HEADER_LENGTH * BLOCK_COUNT
 XOR_OFFSET = BLOCK_HEADER_LENGTH - 1
 
 BLOCK_STATUS_FREE = 0xA0
@@ -78,6 +79,7 @@ GAME_CODE_LENGTH = 8
 
 class PS1Card(object):
   _device = None
+  _link_map = None
 
   def __init__(self, device):
     # Keep a reference to received file object se it doesn't get
@@ -93,54 +95,25 @@ class PS1Card(object):
     if self._device is not None:
       self._device.flush()
 
-  def readBlockHeader(self, block_number):
-    assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
-    header = self.read(BLOCK_HEADER_LENGTH, block_number * BLOCK_LENGTH)
-    # Check header consistency
-    computed_xor = 0
-    for byte in header:
-      computed_xor ^= ord(byte)
-    if computed_xor:
-      raise ValueError, 'Header %i corrupted' % (block_number, )
-    return header
-
-  def writeBlockHeader(self, block_number, data):
-    assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
-    assert len(data) == BLOCK_HEADER_LENGTH, hex(len(data))
-    offset = block_number * BLOCK_HEADER_LENGTH
-    self.write(data, offset)
-    self._updateXOR(block_number)
-
-  def _updateXOR(self, block_number):
+  def updateXOR(self, block_number):
     offset = block_number * BLOCK_HEADER_LENGTH
     computed_xor = 0
     for byte in self.read(BLOCK_HEADER_LENGTH - 1, offset):
       computed_xor ^= ord(byte)
-    self.write(chr(computed_xor), offset)
+    self.write(chr(computed_xor), offset + BLOCK_HEADER_LENGTH - 1)
 
-  def readBlock(self, block_number):
-    assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
-    return self.read(BLOCK_LENGTH, block_number * BLOCK_LENGTH)
-
-  def writeBlock(self, block_number, data):
-    assert 0 <= block_number < BLOCK_COUNT, hex(block_number)
-    assert len(data) == BLOCK_LENGTH, hex(len(data))
-    offset = block_number * BLOCK_LENGTH
-    self.write(data, offset)
-
-  def _isSaveHead(self, block_number):
+  def checkXOR(self, block_number):
     offset = block_number * BLOCK_HEADER_LENGTH
-    block_state = ord(self.read(1, offset))
-    return block_state & BLOCK_STATUS_USED == BLOCK_STATUS_USED \
-      and block_state & BLOCK_STATUS_LINKED == 0
-
-  def iterSaveIdList(self):
-    for block_number in xrange(1, BLOCK_COUNT):
-      if self._isSaveHead(block_number):
-        yield block_number
+    computed_xor = 0
+    for byte in self.read(BLOCK_HEADER_LENGTH, offset):
+      computed_xor ^= ord(byte)
+    if computed_xor:
+      raise ValueError, 'Header %i corrupted' % (block_number, )
 
   def iterChainedBlocks(self, block_number):
+    checkXOR = self.checkXOR
     while True:
+      checkXOR(block_number)
       offset = block_number * BLOCK_HEADER_LENGTH + CHAINED_BLOCK_NUMBER_OFFSET
       block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, \
         self.read(CHAINED_BLOCK_NUMBER_LENGTH, offset))[0]
@@ -150,13 +123,22 @@ class PS1Card(object):
       yield block_number
 
   def getBlockLinkMap(self):
-    link_map = {}
-    for block_number in xrange(1, BLOCK_COUNT):
-      if block_number not in link_map and self._isSaveHead(block_number):
-        link_map[block_number] = block_number
-        for chained_block_number in self.iterChainedBlocks(block_number):
-          link_map[chained_block_number] = block_number
-    return link_map
+    link_map = self._link_map
+    if link_map is None:
+      link_map = {}
+      for block_number in xrange(1, BLOCK_COUNT):
+        if block_number not in link_map:
+          self.checkXOR(block_number)
+          block_state = ord(self.read(1, block_number * BLOCK_HEADER_LENGTH))
+          if block_state & BLOCK_STATUS_USED == BLOCK_STATUS_USED:
+            if block_state & BLOCK_STATUS_LINKED:
+              link_map[block_number] = -1
+            else:
+              link_map[block_number] = block_number
+              for chained_block_number in self.iterChainedBlocks(block_number):
+                link_map[chained_block_number] = block_number
+      self._link_map = link_map
+    return link_map.copy()
 
   def getSave(self, block_number):
     base_block_number = self.getBlockLinkMap().get(block_number)
@@ -173,6 +155,7 @@ class PS1Card(object):
     """
       If block is free, mark it as used and erase content.
     """
+    self.checkXOR(block_number)
     offset = block_number * BLOCK_HEADER_LENGTH
     if ord(self.read(1, offset)) & BLOCK_STATUS_USED == 0:
       write = self.write
@@ -188,7 +171,7 @@ class PS1Card(object):
       write(pack(CHAINED_BLOCK_NUMBER_FORMAT, CHAINED_BLOCK_VALUE_NONE),
         offset + CHAINED_BLOCK_NUMBER_OFFSET)
       # we're done editing header, compute XOR
-      self._updateXOR(block_number)
+      self.updateXOR(block_number)
     else:
       raise ValueError, 'Block %i already allocated' % (block_number, )
 
@@ -212,6 +195,9 @@ class PS1Card(object):
       raise ValueError, 'Block %i already free' % (block_number, )
 
   def write(self, buf, offset):
+    if offset < BLOCK_HEADER_AREA_LENGTH:
+      # Invalidate cached link map when writing in a block header
+      self._link_map = None
     self._device[offset:offset + len(buf)] = buf
 
   def read(self, size, offset):
@@ -236,64 +222,115 @@ class PS1Save(object):
       SAVE_LENGTH_OFFSET + SAVE_LENGTH_LENGTH])[0]
     for block_number in card.iterChainedBlocks(first_block_number):
       append(block_number)
-    assert save_length == self.getDataLength()
+    assert save_length == self.getDataSize()
 
-  def getGameCode(self):
-    return self._game_code
+  def readHeader(self, name, size, offset):
+    entry_size = self.getEntrySize(name)
+    if offset < entry_size:
+      base_offset = self._block_list[0] * BLOCK_LENGTH
+      result = self._card.read(min(size, entry_size - offset),
+        self.getEntryOffset(name) + offset + base_offset)
+    else:
+      result = ''
+    return result
 
-  def getProductCode(self):
-    return self._product_code
+  def writeHeader(self, name, buf, offset):
+    entry_size = self.getEntrySize(name)
+    if offset < entry_size:
+      card = self._card
+      block_number = self._block_list[0]
+      base_offset = block_number * BLOCK_LENGTH
+      result = entry_size - offset
+      card.write(buf[:result],
+        self.getEntryOffset(name) + offset + base_offset)
+      card.updateXOR(block_number)
+    else:
+      result = 0
+    return result
 
-  def getData(self):
+  def readData(self, size, offset):
+    data_size = self.getDataSize()
     result = []
-    append = result.append
-    for block_number in self._block_list:
-      append(self._card.readBlock(block_number))
+    if offset < data_size:
+      append = result.append
+      block_list = self._block_list
+      read = self._card.read
+      size = min(size, data_size - offset)
+      while size:
+        block_id, block_offset = divmod(offset, BLOCK_LENGTH)
+        to_read = BLOCK_LENGTH - block_offset
+        append(read(to_read,
+          block_list[block_id] * BLOCK_LENGTH + block_offset))
+        size -= to_read
+        offset += to_read
     return ''.join(result)
+
+  def writeData(self, buf, offset):
+    data_size = self.getDataSize()
+    if offset >= data_size:
+      raise ValueError, 'Writing past end of file'
+    written = 0
+    block_list = self._block_list
+    block_count = len(block_list)
+    write = self._card.write
+    while buf:
+      block_id, block_offset = divmod(offset + written, BLOCK_LENGTH)
+      if block_id >= block_count:
+        break
+      to_write = min(len(buf), BLOCK_LENGTH - block_offset)
+      data_to_write, buf = buf[:to_write], buf[to_write:]
+      write(data_to_write, block_list[block_id] * BLOCK_LENGTH + block_offset)
+      written += to_write
+    return written
+
+  def read(self, name, size, offset):
+    if name == SAVE_DATA_ENTRY_ID:
+      result = self.readData(size, offset)
+    else:
+      result = self.readHeader(name, size, offset)
+    return result
+
+  def write(self, name, buf, offset):
+    if name == SAVE_DATA_ENTRY_ID:
+      result = self.writeData(buf, offset)
+    else:
+      result = self.writeHeader(name, buf, offset)
+    return result
 
   def iterEntries(self):
     for entry in SAVE_ENTRY_DICT.iterkeys():
       yield entry
 
-  def getEntry(self, name):
-    if name in SAVE_ENTRY_DICT:
-      return getattr(self, SAVE_ENTRY_DICT[name]['accessor'])()
-    else:
-      return None
-
   def hasEntry(self, name):
     return name in SAVE_ENTRY_DICT
 
-  def getEntrySize(self, name):
-     if name in SAVE_ENTRY_DICT:
-       size = SAVE_ENTRY_DICT[name]['size']
-       if callable(size):
-         size = size(self)
-     else:
-       size = None
-     return size
+  def getEntryOffset(self, name):
+    return SAVE_ENTRY_DICT[name]['offset']
 
-  def getDataLength(self):
+  def getEntrySize(self, name):
+    if name == SAVE_DATA_ENTRY_ID:
+      result = self.getDataSize()
+    else:
+      result = SAVE_ENTRY_DICT[name]['size']
+    return result
+
+  def getDataSize(self):
     return len(self._block_list) * BLOCK_LENGTH
 
-  def getRegion(self):
-    return self._region
+SAVE_DATA_ENTRY_ID = 'data'
 
 SAVE_ENTRY_DICT = {
+  SAVE_DATA_ENTRY_ID: None,
   'game_code': {
-    'accessor': 'getGameCode',
+    'offset': GAME_CODE_OFFSET,
     'size': GAME_CODE_LENGTH,
   },
   'product_code': {
-    'accessor': 'getProductCode',
+    'offset': PRODUCT_CODE_OFFSET,
     'size': PRODUCT_CODE_LENGTH,
   },
-  'data': {
-    'accessor': 'getData',
-    'size': lambda x: x.getDataLength(),
-  },
   'region': {
-    'accessor': 'getRegion',
+    'offset': REGION_CODE_OFFSET,
     'size': REGION_CODE_LENGTH,
   },
 }

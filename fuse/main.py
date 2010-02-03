@@ -57,18 +57,23 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             st.st_mode = stat.S_IFREG | 0644
             st.st_nlink = 1
         elif depth == 1:
-            link_map = self.__card_device.getBlockLinkMap()
             block_id = getBlockId(path_element_list[0])
             if block_id is None:
                 return -errno.ENOENT
-            target_id = link_map.get(block_id)
-            if target_id == block_id:
+            target_id = self.__card_device.getBlockLinkMap().get(block_id)
+            if target_id is None:
+                # Unknown: ENOENT
+                return -errno.ENOENT
+            elif target_id == -1:
+                # Orphan block: file
+                st.st_mode = stat.S_IFREG
+                st.st_nlink = 1
+            elif target_id == block_id:
+                # Save head: directory
                 st.st_mode = stat.S_IFDIR | 0555
                 st.st_nlink = 2
-            elif target_id is None:
-                return -errno.ENOENT
             else:
-                # Symlink
+                # Linked block: symlink
                 st.st_mode = stat.S_IFLNK | 0777
                 st.st_nlink = 1
         elif depth == 0:
@@ -154,7 +159,21 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             save = self.__getSave(path_element_list[0])
             if save is None:
                 return -errno.ENOENT
-            return save.getEntry(path_element_list[1])[offset:offset + size]
+            return save.read(path_element_list[1], size, offset)
+        else:
+            return -errno.ENOENT
+
+    def write(self, path, buf, offset):
+        path_element_list = split(path)
+        if len(path_element_list) == 2:
+            save = self.__getSave(path_element_list[0])
+            if save is None:
+                return -errno.ENOENT
+            try:
+                result = save.write(path_element_list[1], buf, offset)
+            except ValueError:
+                result = -errno.EFBIG
+            return result
         else:
             return -errno.ENOENT
 
