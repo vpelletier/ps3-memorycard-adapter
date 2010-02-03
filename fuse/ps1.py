@@ -224,7 +224,8 @@ class PS1Save(object):
     append = block_list.append
     self._block_list = block_list
     block_number = first_block_number
-    block_header = card.readBlockHeader(first_block_number)
+    block_header = card.read(BLOCK_HEADER_LENGTH,
+      first_block_number * BLOCK_HEADER_LENGTH)
     self._region = block_header[REGION_CODE_OFFSET: \
       REGION_CODE_OFFSET + REGION_CODE_LENGTH]
     self._product_code = block_header[PRODUCT_CODE_OFFSET: \
