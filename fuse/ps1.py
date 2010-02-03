@@ -185,10 +185,6 @@ class PS1Card(object):
       write(UNKNOWN_OFFSET_1_VALUE, UNKNOWN_OFFSET_1)
       # we're done editing header, compute XOR
       self._updateXOR(block_number)
-      # zero data block
-      data_offset = block_number * BLOCK_LENGTH
-      for offset in xrange(data_offset, data_offset + BLOCK_LENGTH):
-        write('\x00', offset)
     else:
       raise ValueError, 'Block already allocated'
 
