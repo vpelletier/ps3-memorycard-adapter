@@ -167,6 +167,9 @@ class PS1Card(object):
     return result
 
   def createSave(self, block_number):
+    self._allocateBlock(block_number, True)
+
+  def _allocateBlock(self, block_number, is_head):
     """
       If block is free, mark it as used and erase content.
     """
@@ -175,14 +178,15 @@ class PS1Card(object):
       write = self.write
       # Mark as used
       write(chr(BLOCK_STATUS_USED | BLOCK_STATUS_END), offset)
-      # Initialise save length to 1 block
-      write(pack(SAVE_LENGTH_FORMAT, BLOCK_LENGTH),
-        offset + SAVE_LENGTH_OFFSET)
+      if is_head:
+        # Initialise save length to 1 block
+        write(pack(SAVE_LENGTH_FORMAT, BLOCK_LENGTH),
+          offset + SAVE_LENGTH_OFFSET)
+        # Set unknown value 1
+        write(UNKNOWN_OFFSET_1_VALUE, UNKNOWN_OFFSET_1)
       # Mark there is no next block
       write(pack(CHAINED_BLOCK_NUMBER_FORMAT, CHAINED_BLOCK_VALUE_NONE),
         offset + CHAINED_BLOCK_NUMBER_OFFSET)
-      # Set unknown value 1
-      write(UNKNOWN_OFFSET_1_VALUE, UNKNOWN_OFFSET_1)
       # we're done editing header, compute XOR
       self._updateXOR(block_number)
     else:
