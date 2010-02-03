@@ -238,9 +238,6 @@ class PS1Save(object):
       append(block_number)
     assert save_length == self.getDataLength()
 
-  def getId(self):
-    return str(self._block_list[0])
-
   def getGameCode(self):
     return self._game_code
 
