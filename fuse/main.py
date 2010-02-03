@@ -177,6 +177,29 @@ class PlayStationMemoryCardFS(fuse.Fuse):
         else:
             return -errno.ENOENT
 
+    def symlink(self, src, dst):
+        dst_path_element_list = split(dst)
+        if len(dst_path_element_list) == 1:
+            src_path_element_list = split(src)
+            if len(src_path_element_list) == 1:
+                src_block_id = getBlockId(src_path_element_list[0])
+                dst_block_id = getBlockId(dst_path_element_list[0])
+                if None in (src_block_id, dst_block_id):
+                    result = -errno.ENOENT
+                else:
+                    try:
+                        self.__card_device.appendBlock(src_block_id,
+                            dst_block_id)
+                    except ValueError:
+                        result = -errno.EEXIST
+                    else:
+                        result = 0
+            else:
+                result = -errno.ENOENT
+        else:
+            result = -errno.ENOSPC
+        return result
+
     def main(self):
         args = self.cmdline[1]
         assert len(args) == 1, 'Memory card device name expected as argument.'

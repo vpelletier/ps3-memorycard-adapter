@@ -175,6 +175,34 @@ class PS1Card(object):
     else:
       raise ValueError, 'Block %i already allocated' % (block_number, )
 
+  def _chainBlocks(self, first_block_number, second_block_number):
+    write(pack(CHAINED_BLOCK_NUMBER_FORMAT, second_block_number),
+      first_block_number * BLOCK_HEADER_LENGTH + CHAINED_BLOCK_NUMBER_OFFSET)
+
+  def _getSaveBlockCount(self, block_number):
+    size_offset = block_number * BLOCK_HEADER_LENGTH + SAVE_LENGTH_OFFSET
+    current_size = unpack(SAVE_LENGTH_FORMAT,
+      self.read(SAVE_LENGTH_LENGTH, size_offset))[0]
+    assert current_size % BLOCK_LENGTH == 0, current_size
+    return current_size / BLOCK_LENGTH
+
+  def _setSaveBlockCount(self, block_number, block_count):
+    size_offset = block_number * BLOCK_HEADER_LENGTH + SAVE_LENGTH_OFFSET
+    self.write(pack(SAVE_LENGTH_FORMAT, block_count * BLOCK_LENGTH),
+      size_offset)
+
+  def appendBlock(self, head_block_number, new_block_number):
+    self._allocateBlock(new_block_number, False)
+    last_block_number = head_block_number
+    for last_block_number in self.iterChainedBlocks(head_block_number):
+      pass
+    self._chainBlocks(last_block_number, new_block_number)
+    if last_block_number != head_block_number:
+      self.updateXOR(last_block_number)
+    self._setSaveBlockCount(head_block_number,
+      self._getSaveBlockCount(head_block_number) + 1)
+    self.updateXOR(head_block_number)
+
   def _freeBlock(self, block_number):
     offset = block_number * BLOCK_HEADER_LENGTH
     block_state = ord(self.read(1, offset))
