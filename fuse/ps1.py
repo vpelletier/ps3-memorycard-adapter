@@ -190,7 +190,7 @@ class PS1Card(object):
       # we're done editing header, compute XOR
       self._updateXOR(block_number)
     else:
-      raise ValueError, 'Block already allocated'
+      raise ValueError, 'Block %i already allocated' % (block_number, )
 
   def _freeBlock(self, block_number):
     offset = block_number * BLOCK_HEADER_LENGTH
@@ -209,7 +209,7 @@ class PS1Card(object):
         self._freeBlock(linked_block_number)
       self._freeBlock(block_number)
     else:
-      raise ValueError, 'Block already free'
+      raise ValueError, 'Block %i already free' % (block_number, )
 
   def write(self, buf, offset):
     self._device[offset:offset + len(buf)] = buf
