@@ -207,6 +207,7 @@ class PS1Card(object):
     offset = block_number * BLOCK_HEADER_LENGTH
     block_state = ord(self.read(1, offset))
     self.write(chr((block_state & 0xf) | BLOCK_STATUS_FREE), offset)
+    self.updateXOR(block_number)
 
   def deleteSave(self, block_number):
     """
