@@ -1,7 +1,3 @@
-from struct import pack, unpack, calcsize
-import mmap
-from cStringIO import StringIO
-
 """
 Some rules for this description:
  - Individual bytes are displayed in file order (file offset increases when
@@ -46,6 +42,9 @@ Block allocation table structure:
     0xc, 10: Product code
     0x10, 8: Save identifier
 """
+from struct import pack, unpack, calcsize
+import mmap
+from cStringIO import StringIO
 
 SUPERBLOCK_MAGIC = 'MC'
 
