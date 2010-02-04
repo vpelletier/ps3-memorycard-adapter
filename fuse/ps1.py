@@ -178,7 +178,7 @@ class PS1Card(object):
             raise ValueError, 'Block %i already allocated' % (block_number, )
 
     def _chainBlocks(self, first_block_number, second_block_number):
-        write(pack(CHAINED_BLOCK_NUMBER_FORMAT, second_block_number),
+        self.write(pack(CHAINED_BLOCK_NUMBER_FORMAT, second_block_number),
           first_block_number * BLOCK_HEADER_LENGTH + \
           CHAINED_BLOCK_NUMBER_OFFSET)
 
