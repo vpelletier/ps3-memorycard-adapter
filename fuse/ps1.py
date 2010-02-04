@@ -44,7 +44,6 @@ Block allocation table structure:
 """
 from struct import pack, unpack, calcsize
 import mmap
-from cStringIO import StringIO
 
 SUPERBLOCK_MAGIC = 'MC'
 
