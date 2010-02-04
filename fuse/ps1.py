@@ -203,7 +203,7 @@ class PS1Card(object):
       self._getSaveBlockCount(head_block_number) + 1)
     self.updateXOR(head_block_number)
 
-  def _freeBlock(self, block_number):
+  def freeBlock(self, block_number):
     offset = block_number * BLOCK_HEADER_LENGTH
     block_state = ord(self.read(1, offset))
     self.write(chr((block_state & 0xf) | BLOCK_STATUS_FREE), offset)
@@ -218,8 +218,8 @@ class PS1Card(object):
     offset = block_number * BLOCK_HEADER_LENGTH
     if ord(self.read(1, offset)) & BLOCK_STATUS_USED == BLOCK_STATUS_USED:
       for linked_block_number in self.iterChainedBlocks(block_number):
-        self._freeBlock(linked_block_number)
-      self._freeBlock(block_number)
+        self.freeBlock(linked_block_number)
+      self.freeBlock(block_number)
     else:
       raise ValueError, 'Block %i already free' % (block_number, )
 

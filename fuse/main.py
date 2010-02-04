@@ -200,6 +200,26 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             result = -errno.ENOSPC
         return result
 
+    def unlink(self, path):
+        path_element_list = split(path)
+        if len(path_element_list) == 1:
+            block_id = getBlockId(path_element_list[0])
+            if block_id is None:
+                return -errno.ENOENT
+            target_id = self.__card_device.getBlockLinkMap().get(block_id)
+            if target_id is None:
+                result = -errno.ENOENT
+            elif target_id == -1:
+                # Orphaned block
+                self.__card_device.freeBlock(block_id)
+                result = 0
+            else:
+                # Any save block: should use rmdir on its head block
+                result = -errno.EPERM
+        else:
+            result = -errno.EPERM
+        return result
+
     def main(self):
         args = self.cmdline[1]
         assert len(args) == 1, 'Memory card device name expected as argument.'
