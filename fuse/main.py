@@ -40,9 +40,9 @@ class PlayStationMemoryCardFS(fuse.Fuse):
     def __getSave(self, name):
         block_id = getBlockId(name)
         if block_id is None:
-           result = None
+            result = None
         else:
-           result = self.__card_device.getSave(int(name))
+            result = self.__card_device.getSave(int(name))
         return result
 
     def getattr(self, path):
@@ -100,7 +100,7 @@ class PlayStationMemoryCardFS(fuse.Fuse):
 
     def readdir(self, path, offset):
         for entry in ('.', '..'):
-          yield fuse.Direntry(entry)
+            yield fuse.Direntry(entry)
         path_element_list = split(path)
         depth = len(path_element_list)
         if depth == 0:
