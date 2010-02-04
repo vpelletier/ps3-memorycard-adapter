@@ -53,7 +53,10 @@ class PlayStationMemoryCardFS(fuse.Fuse):
             save = self.__getSave(path_element_list[0])
             if save is None:
                 return -errno.ENOENT
-            st.st_size = save.getEntrySize(path_element_list[1])
+            try:
+                st.st_size = save.getEntrySize(path_element_list[1])
+            except KeyError:
+                return -errno.ENOENT
             st.st_mode = stat.S_IFREG | 0644
             st.st_nlink = 1
         elif depth == 1:
