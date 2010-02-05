@@ -62,3 +62,4 @@ class CachedAuthenticator(object):
             # In case it doesn't, provide a dummy default
             result = ['\x00' * 9] * 3
         return result
+

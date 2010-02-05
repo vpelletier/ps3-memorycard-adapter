@@ -118,3 +118,4 @@ class NBDServer(object):
             answer(sock, handle, error=ERROR_NOT_IMPLEMENTED)
             result = False
         return result
+

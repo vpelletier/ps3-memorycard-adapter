@@ -121,3 +121,4 @@ class FileDictCache(object):
             self._cache_file.flush()
 
             self._cache_to_save = {}
+
