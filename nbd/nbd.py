@@ -31,7 +31,7 @@ def answer(sock, handle, error=0, data=''):
 
 class NBDServer(object):
     """
-      Python implementation of MBD protocol.
+      Python implementation of NBD protocol.
 
       Socket handling & event loop must be done outside of this class.
     """
