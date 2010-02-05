@@ -36,6 +36,8 @@ class NBDServer(object):
       Socket handling & event loop must be done outside of this class.
     """
 
+    _read_only = False
+
     def __init__(self, device):
         """
           device
