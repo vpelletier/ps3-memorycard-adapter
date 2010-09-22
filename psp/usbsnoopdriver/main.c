@@ -422,17 +422,17 @@ int stop_func(int size, void *p) {
 
 /* USB host driver */
 struct UsbDriver g_driver = {
-	SNOOPDRIVER_NAME,
-	4,
-	endp,
-	&intp,
-	NULL, NULL, NULL, NULL,
-	(struct StringDescriptor *) strp,
-	usb_request, func28, usb_attach, usb_detach,
-	0,
-	start_func,
-	stop_func,
-	NULL
+	.name = SNOOPDRIVER_NAME,
+	.endpoints = 4,
+	.endp = endp,
+	.intp = &intp,
+	.devp_hi = NULL, .confp_hi = NULL, .devp = NULL, .confp = NULL,
+	.str = (struct StringDescriptor *) strp,
+	.recvctl = usb_request, .func28 = func28, .attach = usb_attach, .detach = usb_detach,
+	.unk34 = 0,
+	.start_func = start_func,
+	.stop_func = stop_func,
+	.link = NULL
 };
 
 /* Entry point */
