@@ -10,7 +10,7 @@
 #include "usbsnoopdriver.h"
 
 #define ENDPOINT_COUNT 4
-#define ENDPOINT_DESCRIPTOR_COUNT 3
+#define ENDPOINT_DESCRIPTOR_COUNT (ENDPOINT_COUNT - 1)
 
 /* XXX: the exact set of required flags is unknown. */
 PSP_MODULE_INFO(MODULE_NAME, PSP_MODULE_KERNEL | PSP_MODULE_SINGLE_START |
