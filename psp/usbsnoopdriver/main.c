@@ -423,7 +423,7 @@ int stop_func(int size, void *p) {
 /* USB host driver */
 struct UsbDriver g_driver = {
 	.name = SNOOPDRIVER_NAME,
-	.endpoints = 4,
+	.endpoints = ENDPOINT_COUNT,
 	.endp = endp,
 	.intp = &intp,
 	.devp_hi = NULL, .confp_hi = NULL, .devp = NULL, .confp = NULL,
