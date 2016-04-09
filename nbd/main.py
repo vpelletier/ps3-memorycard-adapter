@@ -16,25 +16,22 @@ def main(options):
     authenticator = SockAuthenticator(options.auth_address, options.auth_port,
       authentication_cache)
     try:
-        usb_context = usb1.LibUSBContext()
-        usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
-        usb_device.claimInterface(0)
-        reader = PlayStationMemoryCardReader(usb_device, authenticator)
-        print 'Waiting for client...'
-        while True:
-            (nbd_client_sock, addr) = nbd_sock.accept()
-            print 'Client connected %s:%i' % addr
-            nbd_server = NBDServer(reader)
-            nbd_server.greet(nbd_client_sock)
-            while nbd_server.handle(nbd_client_sock):
-                pass
-            nbd_client_sock.shutdown(socket.SHUT_RDWR)
-            nbd_client_sock.close()
-            print 'Client disconnected'
+        with usb1.USBContext() as usb_context:
+            usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
+            with usb_device.claimInterface(0):
+                reader = PlayStationMemoryCardReader(usb_device, authenticator)
+                print 'Waiting for client...'
+                while True:
+                    (nbd_client_sock, addr) = nbd_sock.accept()
+                    print 'Client connected %s:%i' % addr
+                    nbd_server = NBDServer(reader)
+                    nbd_server.greet(nbd_client_sock)
+                    while nbd_server.handle(nbd_client_sock):
+                        pass
+                    nbd_client_sock.shutdown(socket.SHUT_RDWR)
+                    nbd_client_sock.close()
+                    print 'Client disconnected'
     finally:
-        usb_device.releaseInterface(0)
-        usb_device.close()
-        usb_context.exit()
         nbd_sock.shutdown(socket.SHUT_RDWR)
         nbd_sock.close()
 
