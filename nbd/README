@@ -34,7 +34,7 @@ reader.
 Authentication Daemon:
 PS2 card access requires the host (computer) to authenticate itself to the
 card reader. This authentication mechanism is not reverse-engineered. Hence,
-the NBD server was written with the support for an external daemon doing auth
+the NBD server was written with support for an external daemon doing auth
 work. This way, it can (indirectly) use an actual PS3 as authentication data
 source. See "psp" directory on this repository for an authentication daemon.
 

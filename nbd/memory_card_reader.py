@@ -21,8 +21,13 @@ PS1_CARD_SIZE = 0x20000
 PS1_COMMAND_TAIL = b'\x00' * 0x86 # 0x36 + 0x40 + 0x16
 
 CARD_SIZE_DICT = {
-  PS1_CARD_TYPE: PS1_CARD_SIZE,
-  PS2_CARD_TYPE: PS2_CARD_SIZE,
+    PS1_CARD_TYPE: PS1_CARD_SIZE,
+    PS2_CARD_TYPE: PS2_CARD_SIZE,
+}
+
+CARD_PAGE_DICT = {
+    PS1_CARD_TYPE: FRAME_LENGTH,
+    PS2_CARD_TYPE: PAGE_LENGTH,
 }
 
 def hexdump(data):
@@ -118,7 +123,7 @@ class PlayStationMemoryCardReader(object):
         """
         # TODO:
         # - check frame number
-        encoded_frame_number = pack('>h', frame_number)
+        encoded_frame_number = pack('>H', frame_number)
         self._longCommandWrite(b'\x81\x52\x00\x00' + \
           encoded_frame_number + PS1_COMMAND_TAIL)
         response_code, data = self._longResponseRead()
@@ -140,7 +145,7 @@ class PlayStationMemoryCardReader(object):
         assert len(data) == FRAME_LENGTH
         # TODO:
         # - check frame number
-        encoded_frame_number = pack('>h', frame_number)
+        encoded_frame_number = pack('>H', frame_number)
         self._longCommandWrite(''.join((
           b'\x81\x57\x5a\x5d',
           encoded_frame_number,
@@ -170,7 +175,7 @@ class PlayStationMemoryCardReader(object):
         # TODO:
         # - check page number
         self.authenticate()
-        self._commandWrite(b'\x52\x03' + pack('<i', page_number) + b'\x55\x2b')
+        self._commandWrite(b'\x52\x03' + pack('<I', page_number) + b'\x55\x2b')
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         assert len(data) == PAGE_LENGTH, '%i: %s' % (len(data), hexdump(data))
@@ -186,7 +191,7 @@ class PlayStationMemoryCardReader(object):
         self.authenticate()
         self._commandWrite(''.join((
           b'\x57\x03',
-          pack('<i', page_number),
+          pack('<I', page_number),
           data,
           b'\x55\x2b'
         )))
@@ -304,14 +309,12 @@ class PlayStationMemoryCardReader(object):
         card_type = self.getCardType()
         if card_type == 1:
             read = self.readFrame
-            block_length = FRAME_LENGTH
-            max_length = PS1_CARD_SIZE
         elif card_type == 2:
             read = self.readPage
-            block_length = PAGE_LENGTH
-            max_length = PS2_CARD_SIZE
         else:
             raise ValueError('No/unknown card (%02x)' % (card_type, ))
+        block_length = self._getPageSize(card_type)
+        max_length = self._getSize(card_type)
         if offset + length > max_length:
             raise ValueError('Trying to read out of card.')
         result = []
@@ -341,15 +344,13 @@ class PlayStationMemoryCardReader(object):
         if card_type == 1:
             read = self.readFrame
             write = self.writeFrame
-            block_length = FRAME_LENGTH
-            max_length = PS1_CARD_SIZE
         elif card_type == 2:
             read = self.readPage
             write = self.writePage
-            block_length = PAGE_LENGTH
-            max_length = PS2_CARD_SIZE
         else:
             raise ValueError('No/unknown card (%02x)' % (card_type, ))
+        block_length = self._getPageSize(card_type)
+        max_length = self._getSize(card_type)
         if offset + len(data) > max_length:
             raise ValueError('Trying to write out of card.')
         current_block, start_offset = divmod(offset, block_length)
@@ -363,8 +364,19 @@ class PlayStationMemoryCardReader(object):
         if data_len:
             write(current_block, data + read(current_block)[data_len:])
 
+    @staticmethod
+    def _getSize(card_type):
+        return CARD_SIZE_DICT.get(card_type)
+
     def getSize(self):
-        return CARD_SIZE_DICT[self.getCardType()]
+        return self._getSize(self.getCardType())
+
+    @staticmethod
+    def _getPageSize(card_type):
+        return CARD_PAGE_DICT.get(card_type)
+
+    def getPageSize(self):
+        return self._getPageSize(self.getCardType())
 
     # Authentication
     def authenticate(self):
@@ -441,4 +453,3 @@ class PlayStationMemoryCardReader(object):
             if not self.isAuthenticated():
                 raise ValueError('Authentication went to the end, but we ' \
                   'are not authenticated !')
-
