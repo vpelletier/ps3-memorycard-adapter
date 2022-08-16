@@ -107,7 +107,7 @@ class PS1Card(object):
         for byte in self.read(BLOCK_HEADER_LENGTH, offset):
             computed_xor ^= ord(byte)
         if computed_xor:
-            raise ValueError, 'Header %i corrupted' % (block_number, )
+            raise ValueError('Header %i corrupted' % (block_number, ))
 
     def iterChainedBlocks(self, block_number):
         checkXOR = self.checkXOR
@@ -126,7 +126,7 @@ class PS1Card(object):
         link_map = self._link_map
         if link_map is None:
             link_map = {}
-            for block_number in xrange(1, BLOCK_COUNT):
+            for block_number in range(1, BLOCK_COUNT):
                 if block_number not in link_map:
                     self.checkXOR(block_number)
                     block_state = ord(self.read(1, block_number * \
@@ -175,7 +175,7 @@ class PS1Card(object):
             # we're done editing header, compute XOR
             self.updateXOR(block_number)
         else:
-            raise ValueError, 'Block %i already allocated' % (block_number, )
+            raise ValueError('Block %i already allocated' % (block_number, ))
 
     def _chainBlocks(self, first_block_number, second_block_number):
         self.write(pack(CHAINED_BLOCK_NUMBER_FORMAT, second_block_number),
@@ -224,7 +224,7 @@ class PS1Card(object):
                 self.freeBlock(linked_block_number)
             self.freeBlock(block_number)
         else:
-            raise ValueError, 'Block %i already free' % (block_number, )
+            raise ValueError('Block %i already free' % (block_number, ))
 
     def write(self, buf, offset):
         if offset < BLOCK_HEADER_AREA_LENGTH:
@@ -300,7 +300,7 @@ class PS1Save(object):
     def writeData(self, buf, offset):
         data_size = self.getDataSize()
         if offset >= data_size:
-            raise ValueError, 'Writing past end of file'
+            raise ValueError('Writing past end of file')
         written = 0
         block_list = self._block_list
         block_count = len(block_list)
@@ -331,7 +331,7 @@ class PS1Save(object):
         return result
 
     def iterEntries(self):
-        for entry in SAVE_ENTRY_DICT.iterkeys():
+        for entry in SAVE_ENTRY_DICT.keys():
             yield entry
 
     def hasEntry(self, name):

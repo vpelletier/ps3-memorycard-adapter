@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 import socket
 import usb1
 from nbd import NBDServer
@@ -20,17 +20,17 @@ def main(options):
             usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
             with usb_device.claimInterface(0):
                 reader = PlayStationMemoryCardReader(usb_device, authenticator)
-                print 'Waiting for client...'
+                print('Waiting for client...')
                 while True:
                     (nbd_client_sock, addr) = nbd_sock.accept()
-                    print 'Client connected %s:%i' % addr
+                    print('Client connected %s:%i' % addr)
                     nbd_server = NBDServer(reader)
                     nbd_server.greet(nbd_client_sock)
                     while nbd_server.handle(nbd_client_sock):
                         pass
                     nbd_client_sock.shutdown(socket.SHUT_RDWR)
                     nbd_client_sock.close()
-                    print 'Client disconnected'
+                    print('Client disconnected')
     finally:
         nbd_sock.shutdown(socket.SHUT_RDWR)
         nbd_sock.close()

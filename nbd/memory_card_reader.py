@@ -4,11 +4,11 @@ BULK_WRITE_ENDPOINT = 0x2
 BULK_READ_ENDPOINT = 0x1
 BULK_READ_LENGTH = 64
 
-COMMAND_CODE = '\xaa'
-COMMAND_TYPE_LONG = '\x42'
+COMMAND_CODE = b'\xaa'
+COMMAND_TYPE_LONG = b'\x42'
 
-RESPONSE_CODE = '\x55'
-RESPONSE_STATUS_SUCCES = '\x5a'
+RESPONSE_CODE = b'\x55'
+RESPONSE_STATUS_SUCCES = b'\x5a'
 
 PS2_CARD_TYPE = 2
 PAGE_LENGTH = 0x210 # PS2
@@ -18,7 +18,7 @@ PS1_CARD_TYPE = 1
 FRAME_LENGTH = 0x80 # PS1
 PS1_CARD_SIZE = 0x20000
 
-PS1_COMMAND_TAIL = '\x00' * 0x86 # 0x36 + 0x40 + 0x16
+PS1_COMMAND_TAIL = b'\x00' * 0x86 # 0x36 + 0x40 + 0x16
 
 CARD_SIZE_DICT = {
   PS1_CARD_TYPE: PS1_CARD_SIZE,
@@ -26,14 +26,14 @@ CARD_SIZE_DICT = {
 }
 
 def hexdump(data):
-    return ' '.join('%02x' % (ord(x), ) for x in data)
+    return ' '.join('%02x' % x for x in data)
 
 def _padCommand(command, padding=2):
-    return command + '\x00' * padding
+    return command + b'\x00' * padding
 
 def _stripResponse(response, padding=2):
     stuffing = response[:-padding]
-    assert stuffing == '\xff' * len(stuffing), hexdump(stuffing)
+    assert stuffing == b'\xff' * len(stuffing), hexdump(stuffing)
     return response[-padding:]
 
 class PlayStationMemoryCardReader(object):
@@ -49,16 +49,16 @@ class PlayStationMemoryCardReader(object):
 
     def _responseRead(self):
         result = self._usbRead()
-        if result[0] != RESPONSE_CODE:
-            raise ValueError, 'Received data is not a valid response: %s' % (
-              hexdump(result), )
+        if result[0:1] != RESPONSE_CODE:
+            raise ValueError('Received data is not a valid response: %s' % (
+              hexdump(result), ))
         return result[1:]
 
     def _longResponseRead(self):
         result = []
         append = result.append
         response = self._responseRead()
-        response_code = response[0]
+        response_code = response[0:1]
         if response_code == RESPONSE_STATUS_SUCCES:
             response_length = unpack('<h', response[1:3])[0]
             data = response[3:]
@@ -68,7 +68,7 @@ class PlayStationMemoryCardReader(object):
                 response = self._usbRead()
                 data_length += len(response)
                 append(response)
-        return response_code, ''.join(result)
+        return response_code, b''.join(result)
 
     def _usbWrite(self, data):
         #print '>', hexdump(data)
@@ -88,10 +88,10 @@ class PlayStationMemoryCardReader(object):
            1: PS1 card
            2: PS2 card
         """
-        self._commandWrite('\x40')
+        self._commandWrite(b'\x40')
         response = self._responseRead()
         assert len(response) == 1, hexdump(response)
-        return ord(response)
+        return response[0]
 
     def isAuthenticated(self):
         """
@@ -99,15 +99,15 @@ class PlayStationMemoryCardReader(object):
             False: Card reader is in limited mode (PS1 cards only).
             True: Card reader allows full access (PS1 & PS2 card access).
         """
-        self._longCommandWrite(_padCommand('\x81\x11'))
+        self._longCommandWrite(_padCommand(b'\x81\x11'))
         response_code, data = self._longResponseRead()
-        if response_code == '\xaf':
+        if response_code == b'\xaf':
             result = False
         else:
             assert response_code == RESPONSE_STATUS_SUCCES, hexdump(
               response_code)
             response = _stripResponse(data)
-            assert response == '\x2b\x55', hexdump(response)
+            assert response == b'\x2b\x55', hexdump(response)
             result = True
         return result
 
@@ -119,14 +119,14 @@ class PlayStationMemoryCardReader(object):
         # TODO:
         # - check frame number
         encoded_frame_number = pack('>h', frame_number)
-        self._longCommandWrite('\x81\x52\x00\x00' + \
+        self._longCommandWrite(b'\x81\x52\x00\x00' + \
           encoded_frame_number + PS1_COMMAND_TAIL)
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         #data_header = data[:0xa]
-        #assert data_header == '\xff\x00\x5a\x5d\x00\x00\x5c\x5d' + \
+        #assert data_header == b'\xff\x00\x5a\x5d\x00\x00\x5c\x5d' + \
         #  encoded_frame_number, hexdump(data_header)
-        # XXX: Sometimes also '\xff\x08\x5a\x5d\x00\x00\x5c\x5d' + \
+        # XXX: Sometimes also b'\xff\x08\x5a\x5d\x00\x00\x5c\x5d' + \
         #   encoded_frame_number
         #data_tail = data[-2:] # Unknown content (checksum ?)
         data = data[0xa:-2]
@@ -142,17 +142,17 @@ class PlayStationMemoryCardReader(object):
         # - check frame number
         encoded_frame_number = pack('>h', frame_number)
         self._longCommandWrite(''.join((
-          '\x81\x57\x5a\x5d',
+          b'\x81\x57\x5a\x5d',
           encoded_frame_number,
           data,
-          '\x00', # XXX: seems to be some kind of checksum, but data seems written
-                  # even without computing it
-          '\x5c\x5d\x47',
+          b'\x00', # XXX: seems to be some kind of checksum, but data seems written
+                   # even without computing it
+          b'\x5c\x5d\x47',
         )))
         response_code, response_data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
-        assert response_data[:4] == '\xff\x00\x5a\x5d',  hexdump(response_data[:4])
-        assert response_data[4] == '\x00', hexdump(response_data[4])
+        assert response_data[:4] == b'\xff\x00\x5a\x5d',  hexdump(response_data[:4])
+        assert response_data[4] == 0x00, hexdump(response_data[4:5])
         assert response_data[5:7] == encoded_frame_number, \
           hexdump(response_data[5:6])
         assert response_data[7:-3] == data, (hexdump(response_data[7:-3]), \
@@ -170,7 +170,7 @@ class PlayStationMemoryCardReader(object):
         # TODO:
         # - check page number
         self.authenticate()
-        self._commandWrite('\x52\x03' + pack('<i', page_number) + '\x55\x2b')
+        self._commandWrite(b'\x52\x03' + pack('<i', page_number) + b'\x55\x2b')
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         assert len(data) == PAGE_LENGTH, '%i: %s' % (len(data), hexdump(data))
@@ -185,10 +185,10 @@ class PlayStationMemoryCardReader(object):
         # - check page number
         self.authenticate()
         self._commandWrite(''.join((
-          '\x57\x03',
+          b'\x57\x03',
           pack('<i', page_number),
           data,
-          '\x55\x2b'
+          b'\x55\x2b'
         )))
         response = self._responseRead()
         assert len(response) == 1, hexdump(response)
@@ -223,75 +223,75 @@ class PlayStationMemoryCardReader(object):
 
     # Generic & unidentified commands
     def __81f0(self, seq_number):
-        self._longCommandWrite(_padCommand('\x81\xf0' + pack('b', seq_number)))
+        self._longCommandWrite(_padCommand(b'\x81\xf0' + pack('b', seq_number)))
         response_code, data = self._longResponseRead()
         result = response_code == RESPONSE_STATUS_SUCCES
         if result:
             response = _stripResponse(data)
-            assert response == '\x2b\xff', hexdump(response)
+            assert response == b'\x2b\xff', hexdump(response)
         return result
 
     def __recv_81f0(self, seq_number, length):
         padding = length + 2
-        self._longCommandWrite(_padCommand('\x81\xf0' + pack('b', seq_number),
+        self._longCommandWrite(_padCommand(b'\x81\xf0' + pack('b', seq_number),
           padding=padding))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data, padding)
-        assert response[0] == '\x2b' and response[-1] == '\xff', hexdump(
+        assert response[0] == 0x2b and response[-1] == 0xff, hexdump(
           response)
         return response[1:-1]
 
     def __send_81f0(self, seq_number, data):
         assert len(data) == 9, hexdump(data)
-        self._longCommandWrite(_padCommand('\x81\xf0' + pack('b',
+        self._longCommandWrite(_padCommand(b'\x81\xf0' + pack('b',
           seq_number) + data))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data)
-        assert response == '\x2b\xff', hexdump(response)
+        assert response == b'\x2b\xff', hexdump(response)
 
     def __8128(self):
-        self._longCommandWrite(_padCommand('\x81\x28', padding=3))
+        self._longCommandWrite(_padCommand(b'\x81\x28', padding=3))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data, padding=3)
-        assert response == '\x2b\xff\xff', hexdump(response)
+        assert response == b'\x2b\xff\xff', hexdump(response)
 
     def __8127(self):
-        self._longCommandWrite(_padCommand('\x81\x27\x55'))
+        self._longCommandWrite(_padCommand(b'\x81\x27\x55'))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data)
-        assert response == '\x2b\x55', hexdump(response)
+        assert response == b'\x2b\x55', hexdump(response)
 
     def __8126(self):
-        self._longCommandWrite(_padCommand('\x81\x26', padding=11))
+        self._longCommandWrite(_padCommand(b'\x81\x26', padding=11))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data, padding=11)
-        assert response[0] == '\x2b' and response[-1] == '\x55', hexdump(
+        assert response[0] == 0x2b and response[-1] == 0x55, hexdump(
           response)
         return response[1:-1]
 
     def __8158(self):
-        self._longCommandWrite('\x81\x58\x00\x00\x00')
+        self._longCommandWrite(b'\x81\x58\x00\x00\x00')
         response_code, data = self._longResponseRead()
-        assert response_code == '\xaf', hexdump(response_code)
+        assert response_code == b'\xaf', hexdump(response_code)
 
     def __81f3(self):
-        self._longCommandWrite(_padCommand('\x81\xf3\x00'))
+        self._longCommandWrite(_padCommand(b'\x81\xf3\x00'))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data)
-        assert response == '\x2b\xff', hexdump(response)
+        assert response == b'\x2b\xff', hexdump(response)
 
     def __81f7(self):
-        self._longCommandWrite(_padCommand('\x81\xf7\x01'))
+        self._longCommandWrite(_padCommand(b'\x81\xf7\x01'))
         response_code, data = self._longResponseRead()
         assert response_code == RESPONSE_STATUS_SUCCES, hexdump(response_code)
         response = _stripResponse(data)
-        assert response == '\x2b\xff', hexdump(response)
+        assert response == b'\x2b\xff', hexdump(response)
 
     # IO helpers
     def read(self, offset, length):
@@ -311,9 +311,9 @@ class PlayStationMemoryCardReader(object):
             block_length = PAGE_LENGTH
             max_length = PS2_CARD_SIZE
         else:
-            raise ValueError, 'No/unknown card (%02x)' % (card_type, )
+            raise ValueError('No/unknown card (%02x)' % (card_type, ))
         if offset + length > max_length:
-            raise ValueError, 'Trying to read out of card.'
+            raise ValueError('Trying to read out of card.')
         result = []
         append = result.append
         current_block, start_offset = divmod(offset, block_length)
@@ -327,7 +327,7 @@ class PlayStationMemoryCardReader(object):
         result[0] = result[0][start_offset:]
         if result_len > length:
             result[-1] = result[-1][:length - result_len]
-        return ''.join(result)
+        return b''.join(result)
 
     def write(self, offset, data):
         """
@@ -349,9 +349,9 @@ class PlayStationMemoryCardReader(object):
             block_length = PAGE_LENGTH
             max_length = PS2_CARD_SIZE
         else:
-            raise ValueError, 'No/unknown card (%02x)' % (card_type, )
+            raise ValueError('No/unknown card (%02x)' % (card_type, ))
         if offset + len(data) > max_length:
-            raise ValueError, 'Trying to write out of card.'
+            raise ValueError('Trying to write out of card.')
         current_block, start_offset = divmod(offset, block_length)
         if start_offset:
             data = read(current_block)[:start_offset] + data
@@ -410,7 +410,7 @@ class PlayStationMemoryCardReader(object):
             answer_list = self._authenticator.authenticate(seed)
             # ?
             if not self.__81f0(5):
-                print 'Auth timeout, retrying...'
+                print('Auth timeout, retrying...')
                 continue
             # First answer
             self.sendAuthPart1(answer_list[0])
@@ -439,6 +439,6 @@ class PlayStationMemoryCardReader(object):
             self.__8126()
             # Now, we must be authenticated
             if not self.isAuthenticated():
-                raise ValueError, 'Authentication went to the end, but we ' \
-                  'are not authenticated !'
+                raise ValueError('Authentication went to the end, but we ' \
+                  'are not authenticated !')
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 import fuse
 import stat    # for file properties
 import os      # for filesystem modes (O_RDONLY, etc)
@@ -57,7 +57,7 @@ class PlayStationMemoryCardFS(fuse.Fuse):
                 st.st_size = save.getEntrySize(path_element_list[1])
             except KeyError:
                 return -errno.ENOENT
-            st.st_mode = stat.S_IFREG | 0644
+            st.st_mode = stat.S_IFREG | 0o644
             st.st_nlink = 1
         elif depth == 1:
             block_id = getBlockId(path_element_list[0])
@@ -73,14 +73,14 @@ class PlayStationMemoryCardFS(fuse.Fuse):
                 st.st_nlink = 1
             elif target_id == block_id:
                 # Save head: directory
-                st.st_mode = stat.S_IFDIR | 0555
+                st.st_mode = stat.S_IFDIR | 0o555
                 st.st_nlink = 2
             else:
                 # Linked block: symlink
-                st.st_mode = stat.S_IFLNK | 0777
+                st.st_mode = stat.S_IFLNK | 0o777
                 st.st_nlink = 1
         elif depth == 0:
-            st.st_mode = stat.S_IFDIR | 0755
+            st.st_mode = stat.S_IFDIR | 0o755
             st.st_nlink = 2
         else:
             return -errno.ENOENT
@@ -107,7 +107,7 @@ class PlayStationMemoryCardFS(fuse.Fuse):
         path_element_list = split(path)
         depth = len(path_element_list)
         if depth == 0:
-            for save_id in self.__card_device.getBlockLinkMap().iterkeys():
+            for save_id in self.__card_device.getBlockLinkMap().keys():
                 yield fuse.Direntry(asName(save_id))
         elif depth == 1:
             save = self.__getSave(path_element_list[0])

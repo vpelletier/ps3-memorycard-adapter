@@ -38,14 +38,14 @@ class SockAuthenticator(object):
             result = self._authentication_cache[seed]
         except KeyError:
             if len(seed) != SEED_LENGTH:
-                raise ValueError, 'Invalid seed length: %i, expected %i' % (
-                    len(seed), SEED_LENGTH)
+                raise ValueError('Invalid seed length: %i, expected %i' % (
+                    len(seed), SEED_LENGTH))
             sock = self._socket
             if not self._connected:
                 self._connected = True
                 sock.connect((self._ip, self._port))
             sock.send('\x55\x5a\x0e\x00\xff\xff\xff\x2b' + seed + '\xff')
-            result = tuple([sock.recv(0x12)[7:-2] for x in xrange(3)])
+            result = tuple([sock.recv(0x12)[7:-2] for x in range(3)])
             self._authentication_cache[seed] = result
         return result
 

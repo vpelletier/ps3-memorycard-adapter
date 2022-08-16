@@ -61,17 +61,17 @@ class FileDictCache(object):
                 break
             data_len = readLength()
             if data_len is None:
-                raise ValueError, 'Short read when expecting data length, ' \
+                raise ValueError('Short read when expecting data length, ' \
                   'record %i corrupted at %i' % (record_start,
-                  tell() - record_start)
+                  tell() - record_start))
             data = []
             append = data.append
-            for x in xrange(data_len):
+            for x in range(data_len):
                 item = readData()
                 if item is None:
-                    raise ValueError, 'Short read when expecting data item, ' \
+                    raise ValueError('Short read when expecting data item, ' \
                       'record %i corrupted at %i' % (record_start,
-                      tell() - record_start)
+                      tell() - record_start))
                 append(item)
             cache[key] = tuple(data)
 
@@ -84,12 +84,12 @@ class FileDictCache(object):
 
     def __setitem__(self, key, value):
         if not isinstance(value, tuple):
-            raise TypeError, 'Value must be a tuple: %r (%s)' % (value,
-              type(value))
+            raise TypeError('Value must be a tuple: %r (%s)' % (value,
+              type(value)))
         for item in value:
-            if not isinstance(item, basestring):
-                raise TypeError, 'Value elements must be strings: %r (%s) ' \
-                  'for value %r' % (item, type(item), value)
+            if not isinstance(item, str):
+                raise TypeError('Value elements must be strings: %r (%s) ' \
+                  'for value %r' % (item, type(item), value))
         self._cache[key] = value
         if not self._read_only:
             self._cache_to_save[key] = value
@@ -113,7 +113,7 @@ class FileDictCache(object):
                 writeLength(len(data))
                 write(data)
 
-            for key, value in self._cache_to_save.iteritems():
+            for key, value in self._cache_to_save.items():
                 writeData(key)
                 writeLength(len(value))
                 for item in value:
