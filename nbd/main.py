@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+from functools import partial
+import os
+import select
 import socket
 import usb1
 from nbd import NBDServer
@@ -15,31 +18,66 @@ def main(options):
       read_only=options.auth_cache_read_only)
     authenticator = SockAuthenticator(options.auth_address, options.auth_port,
       authentication_cache)
+    # TODO: refactor to support non-blocking IO
     try:
         with usb1.USBContext() as usb_context:
             usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
             with usb_device.claimInterface(0):
                 reader = PlayStationMemoryCardReader(usb_device, authenticator)
                 print('Waiting for client...')
-                while True:
+                epoll = select.epoll()
+                def accept():
                     (nbd_client_sock, addr) = nbd_sock.accept()
+                    fileno = nbd_client_sock.fileno()
                     print('Client connected %s:%i' % addr)
-                    nbd_server = NBDServer(reader)
-                    nbd_server.greet(nbd_client_sock)
-                    while nbd_server.handle(nbd_client_sock):
-                        pass
-                    nbd_client_sock.shutdown(socket.SHUT_RDWR)
-                    nbd_client_sock.close()
-                    print('Client disconnected')
+                    nbd_server = NBDServer(sock=nbd_client_sock, device=reader)
+                    if nbd_server.greet():
+                        socket_dict[fileno] = nbd_server
+                        handler_dict[nbd_server] = nbd_server.handle
+                        epoll.register(
+                            fileno,
+                            select.EPOLLIN | select.EPOLLHUP,
+                        )
+                def handle(nbd_server):
+                    if not nbd_server.handle():
+                        epoll.unregister(nbd_server.fileno())
+                        del socket_dict[nbd_server.fileno()]
+                        del handler_dict[nbd_server]
+
+                socket_dict = {
+                    nbd_sock.fileno(): nbd_sock,
+                }
+                handler_dict = {
+                    nbd_sock: accept,
+                }
+                epoll.register(nbd_sock.fileno(), select.EPOLLIN)
+                while True:
+                    for fd, event in epoll.poll():
+                        print(fd, event)
+                        sock = socket_dict[fd]
+                        if event == select.EPOLLIN:
+                            handler_dict[sock]()
+                        else:
+                            epoll.unregister(sock.fileno())
+                            del socket_dict[sock.fileno()]
+                            del handler_dict[sock]
+                            sock.close()
+    except KeyboardInterrupt:
+        pass
     finally:
+        del socket_dict[nbd_sock.fileno()]
         nbd_sock.shutdown(socket.SHUT_RDWR)
         nbd_sock.close()
+        for sock in socket_dict.values():
+            # ...actually NBDServer objects
+            sock.close()
 
 if __name__ == '__main__':
+    # TODO: argparse, move in main()
     from optparse import OptionParser
 
     parser = OptionParser()
-    parser.add_option('-p', '--nbd-port', default=20530, type='int',
+    parser.add_option('-p', '--nbd-port', default=10809, type='int',
       help='Port the embeded NBD server will listen on.')
     parser.add_option('-a', '--nbd-address', default='',
       help='Address the embeded NBD server will listen on.')
