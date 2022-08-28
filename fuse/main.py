@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import fuse
-import stat    # for file properties
-import os      # for filesystem modes (O_RDONLY, etc)
 import errno   # for error number codes (ENOENT, etc)
                # - note: these must be returned as negatives
+import os      # for filesystem modes (O_RDONLY, etc)
+import os.path
+import stat    # for file properties
+import fuse
 from ps1 import PS1Card
 
 fuse.fuse_python_api = (0, 2)
@@ -225,15 +226,14 @@ class PlayStationMemoryCardFS(fuse.Fuse):
 
     def main(self):
         args = self.cmdline[1]
-        assert len(args) == 1, 'Memory card device name expected as argument.'
-        if 'ro' in self.fuse_args.optlist:
-            mode = ''
-        else:
-            mode = '+'
-        card_device = open(args[0], 'rb' + mode)
-        # TODO: detect card type
-        self.__card_device = PS1Card(card_device)
-        super(PlayStationMemoryCardFS, self).main()
+        if args:
+            assert len(args) == 1, 'Memory card device name expected as argument.'
+            read_only = 'ro' in self.fuse_args.optlist
+            card_device = open(args[0], 'rb' + ('' if read_only else '+'))
+            # TODO: detect card type
+            self.__card_device = PS1Card(card_device, read_only=read_only)
+        print('handing control to Fuse.main')
+        super().main()
 
 def main():
     server = PlayStationMemoryCardFS(dash_s_do='setsingle')

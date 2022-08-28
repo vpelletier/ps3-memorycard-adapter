@@ -40,12 +40,12 @@ Block allocation table structure:
       0x45 ("E"): Europe (SCEE)
       0x49 ("I"): Japan (SCEI)
     0xc, 10: Product code
-    0x10, 8: Save identifier
+    0x16, 8: Save identifier
 """
 from struct import pack, unpack, calcsize
 import mmap
 
-SUPERBLOCK_MAGIC = 'MC'
+SUPERBLOCK_MAGIC = b'MC'
 
 BLOCK_COUNT = 0x10
 BLOCK_LENGTH = 0x2000
@@ -67,19 +67,19 @@ CHAINED_BLOCK_NUMBER_LENGTH = 2
 CHAINED_BLOCK_VALUE_NONE = 0xffff
 assert calcsize(CHAINED_BLOCK_NUMBER_FORMAT) == CHAINED_BLOCK_NUMBER_LENGTH
 UNKNOWN_OFFSET_1 = 0xa
-UNKNOWN_OFFSET_1_VALUE = 'B'
+UNKNOWN_OFFSET_1_VALUE = b'B'
 REGION_CODE_OFFSET = 0xb
 REGION_CODE_LENGTH = 1
 PRODUCT_CODE_OFFSET = 0xc
 PRODUCT_CODE_LENGTH = 10
-GAME_CODE_OFFSET = 0x10
+GAME_CODE_OFFSET = 0x16
 GAME_CODE_LENGTH = 8
 
 class PS1Card(object):
     _device = None
     _link_map = None
 
-    def __init__(self, device):
+    def __init__(self, device, read_only):
         # Keep a reference to received file object se it doesn't get
         # garbage-collected while we might still want to access its mmaped
         # version.
@@ -87,8 +87,13 @@ class PS1Card(object):
         # On the contrary of what is advertised by python mmap module
         # documentation, providing a 0 length to mmap won't map the whole file.
         device.seek(0, 2)
-        self._device = mmap.mmap(device.fileno(), device.tell())
+        self._device = mmap.mmap(
+            device.fileno(),
+            device.tell(),
+            access=(mmap.ACCESS_READ if read_only else mmap.ACCESS_DEEFAULT),
+        )
         assert self.read(len(SUPERBLOCK_MAGIC), 0) == SUPERBLOCK_MAGIC
+        self.checkXOR(0)
 
     def __del__(self):
         if self._device is not None:
@@ -98,14 +103,14 @@ class PS1Card(object):
         offset = block_number * BLOCK_HEADER_LENGTH
         computed_xor = 0
         for byte in self.read(BLOCK_HEADER_LENGTH - 1, offset):
-            computed_xor ^= ord(byte)
+            computed_xor ^= byte
         self.write(chr(computed_xor), offset + BLOCK_HEADER_LENGTH - 1)
 
     def checkXOR(self, block_number):
         offset = block_number * BLOCK_HEADER_LENGTH
         computed_xor = 0
         for byte in self.read(BLOCK_HEADER_LENGTH, offset):
-            computed_xor ^= ord(byte)
+            computed_xor ^= byte
         if computed_xor:
             raise ValueError('Header %i corrupted' % (block_number, ))
 
@@ -113,10 +118,8 @@ class PS1Card(object):
         checkXOR = self.checkXOR
         while True:
             checkXOR(block_number)
-            offset = block_number * BLOCK_HEADER_LENGTH + \
-                CHAINED_BLOCK_NUMBER_OFFSET
-            block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, \
-                self.read(CHAINED_BLOCK_NUMBER_LENGTH, offset))[0]
+            offset = block_number * BLOCK_HEADER_LENGTH + CHAINED_BLOCK_NUMBER_OFFSET
+            block_number = unpack(CHAINED_BLOCK_NUMBER_FORMAT, self.read(CHAINED_BLOCK_NUMBER_LENGTH, offset))[0]
             if block_number == CHAINED_BLOCK_VALUE_NONE:
                 break
             block_number += 1
@@ -129,15 +132,13 @@ class PS1Card(object):
             for block_number in range(1, BLOCK_COUNT):
                 if block_number not in link_map:
                     self.checkXOR(block_number)
-                    block_state = ord(self.read(1, block_number * \
-                        BLOCK_HEADER_LENGTH))
+                    block_state, = self.read(1, block_number * BLOCK_HEADER_LENGTH)
                     if block_state & BLOCK_STATUS_USED == BLOCK_STATUS_USED:
                         if block_state & BLOCK_STATUS_LINKED:
                             link_map[block_number] = -1
                         else:
                             link_map[block_number] = block_number
-                            for chained_block_number in self.iterChainedBlocks(
-                                block_number):
+                            for chained_block_number in self.iterChainedBlocks(block_number):
                                 link_map[chained_block_number] = block_number
             self._link_map = link_map
         return link_map.copy()
@@ -179,8 +180,7 @@ class PS1Card(object):
 
     def _chainBlocks(self, first_block_number, second_block_number):
         self.write(pack(CHAINED_BLOCK_NUMBER_FORMAT, second_block_number),
-          first_block_number * BLOCK_HEADER_LENGTH + \
-          CHAINED_BLOCK_NUMBER_OFFSET)
+          first_block_number * BLOCK_HEADER_LENGTH + CHAINED_BLOCK_NUMBER_OFFSET)
 
     def _getSaveBlockCount(self, block_number):
         size_offset = block_number * BLOCK_HEADER_LENGTH + SAVE_LENGTH_OFFSET
@@ -208,7 +208,7 @@ class PS1Card(object):
 
     def freeBlock(self, block_number):
         offset = block_number * BLOCK_HEADER_LENGTH
-        block_state = ord(self.read(1, offset))
+        block_state, = self.read(1, offset)
         self.write(chr((block_state & 0xf) | BLOCK_STATUS_FREE), offset)
         self.updateXOR(block_number)
 
@@ -238,20 +238,19 @@ class PS1Card(object):
 class PS1Save(object):
     def __init__(self, card, first_block_number):
         self._card = card
-        block_list = [first_block_number]
+        self._block_list = block_list = [first_block_number]
         append = block_list.append
-        self._block_list = block_list
-        block_number = first_block_number
-        block_header = card.read(BLOCK_HEADER_LENGTH,
-            first_block_number * BLOCK_HEADER_LENGTH)
-        self._region = block_header[REGION_CODE_OFFSET: \
-            REGION_CODE_OFFSET + REGION_CODE_LENGTH]
-        self._product_code = block_header[PRODUCT_CODE_OFFSET: \
-            PRODUCT_CODE_OFFSET + PRODUCT_CODE_LENGTH]
-        self._game_code = block_header[GAME_CODE_OFFSET: \
-            GAME_CODE_OFFSET + GAME_CODE_LENGTH]
-        save_length = unpack(SAVE_LENGTH_FORMAT, block_header[ \
-            SAVE_LENGTH_OFFSET:SAVE_LENGTH_OFFSET + SAVE_LENGTH_LENGTH])[0]
+        block_header = card.read(
+            size=BLOCK_HEADER_LENGTH,
+            offset=first_block_number * BLOCK_HEADER_LENGTH,
+        )
+        save_length, = unpack(
+            SAVE_LENGTH_FORMAT,
+            block_header[
+                SAVE_LENGTH_OFFSET:
+                SAVE_LENGTH_OFFSET + SAVE_LENGTH_LENGTH
+            ],
+        )
         for block_number in card.iterChainedBlocks(first_block_number):
             append(block_number)
         assert save_length == self.getDataSize()
@@ -259,11 +258,11 @@ class PS1Save(object):
     def readHeader(self, name, size, offset):
         entry_size = self.getEntrySize(name)
         if offset < entry_size:
-            base_offset = self._block_list[0] * BLOCK_LENGTH
+            base_offset = self._block_list[0] * BLOCK_HEADER_LENGTH
             result = self._card.read(min(size, entry_size - offset),
                 self.getEntryOffset(name) + offset + base_offset)
         else:
-            result = ''
+            result = b''
         return result
 
     def writeHeader(self, name, buf, offset):
@@ -271,7 +270,7 @@ class PS1Save(object):
         if offset < entry_size:
             card = self._card
             block_number = self._block_list[0]
-            base_offset = block_number * BLOCK_LENGTH
+            base_offset = block_number * BLOCK_HEADER_LENGTH
             result = entry_size - offset
             card.write(buf[:result],
               self.getEntryOffset(name) + offset + base_offset)
@@ -295,7 +294,7 @@ class PS1Save(object):
                   block_list[block_id] * BLOCK_LENGTH + block_offset))
                 size -= to_read
                 offset += to_read
-        return ''.join(result)
+        return b''.join(result)
 
     def writeData(self, buf, offset):
         data_size = self.getDataSize()
