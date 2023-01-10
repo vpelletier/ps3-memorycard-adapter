@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from functools import partial
+import sys
 import os
 import select
 import socket
@@ -19,9 +20,11 @@ def main(options):
     authenticator = SockAuthenticator(options.auth_address, options.auth_port,
       authentication_cache)
     # TODO: refactor to support non-blocking IO
-    try:
-        with usb1.USBContext() as usb_context:
-            usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
+    with usb1.USBContext() as usb_context:
+        usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
+        if usb_device is None:
+          sys.exit("Could not find the ps3 adapter usb device")
+        try:
             with usb_device.claimInterface(0):
                 reader = PlayStationMemoryCardReader(usb_device, authenticator)
                 print('Waiting for client...')
@@ -62,15 +65,15 @@ def main(options):
                             del socket_dict[sock.fileno()]
                             del handler_dict[sock]
                             sock.close()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        del socket_dict[nbd_sock.fileno()]
-        nbd_sock.shutdown(socket.SHUT_RDWR)
-        nbd_sock.close()
-        for sock in socket_dict.values():
-            # ...actually NBDServer objects
-            sock.close()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            del socket_dict[nbd_sock.fileno()]
+            nbd_sock.shutdown(socket.SHUT_RDWR)
+            nbd_sock.close()
+            for sock in socket_dict.values():
+                # ...actually NBDServer objects
+                sock.close()
 
 if __name__ == '__main__':
     # TODO: argparse, move in main()
