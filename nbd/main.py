@@ -13,11 +13,11 @@ def main(options):
     nbd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     nbd_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     nbd_sock.bind((options.nbd_address, options.nbd_port))
-    nbd_sock.listen(1)
     authentication_cache = FileDictCache(options.auth_cache,
       read_only=options.auth_cache_read_only)
     authenticator = SockAuthenticator(options.auth_address, options.auth_port,
       authentication_cache)
+    socket_dict = {}
     # TODO: refactor to support non-blocking IO
     try:
         with usb1.USBContext() as usb_context:
@@ -39,29 +39,31 @@ def main(options):
                             select.EPOLLIN | select.EPOLLHUP,
                         )
 
-                socket_dict = {
-                    nbd_sock.fileno(): nbd_sock,
-                }
+                nbd_sock_fileno = nbd_sock.fileno()
+                socket_dict[nbd_sock_fileno] = nbd_sock
                 handler_dict = {
                     nbd_sock: accept,
                 }
-                epoll.register(nbd_sock.fileno(), select.EPOLLIN)
-                while True:
-                    for fd, event in epoll.poll():
-                        print(fd, event)
-                        sock = socket_dict[fd]
-                        if event == select.EPOLLIN:
-                            handler_dict[sock]()
-                        else:
-                            epoll.unregister(sock.fileno())
-                            del socket_dict[sock.fileno()]
-                            del handler_dict[sock]
-                            sock.close()
+                epoll.register(nbd_sock_fileno, select.EPOLLIN)
+                try:
+                    nbd_sock.listen(1)
+                    while True:
+                        for fd, event in epoll.poll():
+                            print(fd, event)
+                            sock = socket_dict[fd]
+                            if event == select.EPOLLIN:
+                                handler_dict[sock]()
+                            else:
+                                epoll.unregister(sock.fileno())
+                                del socket_dict[sock.fileno()]
+                                del handler_dict[sock]
+                                sock.close()
+                finally:
+                    nbd_sock.shutdown(socket.SHUT_RDWR)
+                    del socket_dict[nbd_sock_fileno]
     except KeyboardInterrupt:
         pass
     finally:
-        del socket_dict[nbd_sock.fileno()]
-        nbd_sock.shutdown(socket.SHUT_RDWR)
         nbd_sock.close()
         for sock in socket_dict.values():
             # ...actually NBDServer objects
