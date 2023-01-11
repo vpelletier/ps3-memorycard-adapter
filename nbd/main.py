@@ -38,11 +38,6 @@ def main(options):
                             fileno,
                             select.EPOLLIN | select.EPOLLHUP,
                         )
-                def handle(nbd_server):
-                    if not nbd_server.handle():
-                        epoll.unregister(nbd_server.fileno())
-                        del socket_dict[nbd_server.fileno()]
-                        del handler_dict[nbd_server]
 
                 socket_dict = {
                     nbd_sock.fileno(): nbd_sock,
