@@ -3,6 +3,7 @@ from functools import partial
 import os
 import select
 import socket
+import sys
 import usb1
 from nbd import NBDServer
 from cache import FileDictCache
@@ -21,7 +22,13 @@ def main(options):
     # TODO: refactor to support non-blocking IO
     try:
         with usb1.USBContext() as usb_context:
-            usb_device = usb_context.openByVendorIDAndProductID(0x054c, 0x02ea)
+            usb_device = usb_context.openByVendorIDAndProductID(
+                0x054c,
+                0x02ea,
+                skip_on_error=True,
+            )
+            if usb_device is None:
+                sys.exit("Could not open the ps3 adapter usb device")
             with usb_device.claimInterface(0):
                 reader = PlayStationMemoryCardReader(usb_device, authenticator)
                 print('Waiting for client...')
